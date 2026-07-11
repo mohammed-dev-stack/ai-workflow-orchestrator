@@ -1,24 +1,13 @@
-```markdown
 <div align="center">
 
-# 🤖 AI Workflow Orchestrator
+# 🤖 AI Workflow Orchestrator — Frontend
 
 **Human-in-the-loop automation platform — AI proposes, humans decide.**
 
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-5.4.8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
-[![Express](https://img.shields.io/badge/Express-4.22-000000?logo=express&logoColor=white)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-6.x-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![BullMQ](https://img.shields.io/badge/BullMQ-5.79-FF6B6B)](https://bullmq.io/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4.13-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](#-10-testing-strategy)
-[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-brightgreen)](#-10-testing-strategy)
-[![Bundle Size](https://img.shields.io/badge/bundle-178KB%20gzip-success)](#-11-performance-measured-not-estimated)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6.2-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-[Overview](#-1-overview) · [Architecture](#-2-architecture) · [Tech Stack](#-3-tech-stack--decisions) · [Quick Start](#-6-quick-start) · [Testing](#-10-testing-strategy) · [Contributing](#-15-contributing)
+[Overview](#-1-overview) · [Architecture](#-2-architecture)
 
 </div>
 
@@ -51,7 +40,7 @@
 
 ## 📋 1. Overview
 
-**AI Workflow Orchestrator** is a human-in-the-loop automation platform: the AI proposes actions, and a human reviews, approves, or rejects every sensitive operation before it runs. This monorepo contains both the **backend** (Express + Node.js) and the **frontend** (React + Vite) applications.
+**AI Workflow Orchestrator** is a human-in-the-loop automation platform: the AI proposes actions, and a human reviews, approves, or rejects every sensitive operation before it runs. This repository contains the **frontend application**.
 
 ### Core capabilities
 
@@ -60,48 +49,15 @@
 | 📊 **Dashboard** | Real-time workflow statistics with auto-refreshing counters |
 | ✅ **Approval Inbox** | Review AI-proposed actions with one-click approve/reject |
 | 🧩 **Workflow Builder** | Visual DAG editor for designing automation flows |
-| ⚙️ **AI Settings** | Toggle between mock AI (free, offline) and a real Claude-powered engine |
-| 🔄 **Orchestration Engine** | Executes multi-step workflows via BullMQ job queue |
-| 🧑‍💼 **Human-in-the-Loop** | Pauses at steps requiring approval, resumes on human decision |
+| ⚙️ **AI Settings** | Toggle between mock AI (free, offline) and a real OpenAI-backed engine |
 
-### How it works
+### How it talks to the backend
 
-The backend accepts a **workflow template** (an ordered list of steps, each mapped to a tool such as `send_email`, `create_calendar_event`, or `create_jira_ticket`), and executes it as a **run**. Each run is processed asynchronously by a BullMQ worker calling into a state-machine orchestrator. The frontend communicates via REST API calls to the backend (`localhost:5000`), with **10-second polling** for near-real-time updates.
+REST API calls to the backend (`localhost:5000`), with **10-second polling** for near-real-time updates. WebSockets were evaluated and rejected — see the reasoning in [§4.2](#42-why-polling-not-websockets) and [ADR-003](../docs/adr/003-polling-vs-websockets.md).
 
 ---
 
 ## 🏗️ 2. Architecture
-
-### System Architecture
-
-```mermaid
-graph TB
-    subgraph "Frontend (React + Vite)"
-        UI[User Interface] --> RQ[TanStack Query]
-        RQ --> API[Axios Client]
-        RQ --> ZS[Zustand Store]
-    end
-
-    subgraph "Backend (Express + Node.js)"
-        API --> Routes[API Routes]
-        Routes --> Ctrl[Controllers]
-        Ctrl --> Svc[Services]
-        Svc --> Orch[Orchestrator]
-        Orch --> Worker[BullMQ Worker]
-    end
-
-    subgraph "Infrastructure"
-        Orch --> DB[(MongoDB)]
-        Worker --> Redis[(Redis)]
-        Orch --> Claude[Anthropic Claude API]
-        Orch --> Tools[External Tools<br/>Email, Calendar, Jira]
-    end
-
-    Svc --> Logger[Winston Logger]
-    Ctrl --> Health[Health Checks]
-```
-
-### Frontend Architecture
 
 ```mermaid
 graph TD
@@ -123,21 +79,9 @@ graph TD
     D --> J
     E --> J
     F --> J
-```
 
-### Backend Architecture
-
-```mermaid
-graph TD
-    A[Express Router] --> B[Controllers]
-    B --> C[WorkflowService]
-    C --> D[(MongoDB: Workflow / WorkflowRun)]
-    C --> E[BullMQ Queue]
-    E --> F[RunWorker]
-    F --> G[Orchestrator State Machine]
-    G --> D
-    G --> H[AI Service — mock or Anthropic API]
-    G --> I[Slack Webhook Notification]
+    J --> K[LocalStorage<br/>Persist: theme, sidebar]
+    J --> L[SessionStorage<br/>Persist: draft workflows]
 ```
 
 **Design principle:** server state and client state are deliberately kept apart. TanStack Query owns anything that comes from the API; Zustand owns anything that is purely UI (theme, sidebar, drafts). See [§9](#-9-state-management) for details.
@@ -158,12 +102,7 @@ graph TD
 | **Icons** | FontAwesome | `^7.3.0` | Tree-shakeable, consistent icon set | Emoji icons — accessibility issues, inconsistent rendering across OSes |
 | **Testing** | Vitest + RTL | `^2.1.0` | Native ESM support, 2.1s test run vs. 12s with Jest | Jest — struggled with Vite's ESM, needed complex transforms |
 | **E2E** | Playwright | `^1.45.0` | Cross-browser, auto-waiting, trace viewer | Cypress — slower and flakier with React 18 concurrent features |
-| **Backend Framework** | Express | `^4.21.1` | Minimal, unopinionated, massive ecosystem | NestJS — over-architected for this scope, added 2× startup time |
-| **Database** | MongoDB via Mongoose | `^8.6.0` | Flexible schema for workflow steps | PostgreSQL — we evaluated but needed dynamic step schemas |
-| **Queue** | BullMQ + ioredis | `^5.12.0` | Battle-tested, supports retries and delays | RabbitMQ — heavier, harder to run locally |
-| **Validation** | Zod | `^4.4.3` | Type-safe, runtime validation with schema inference | Joi — no TypeScript inference |
-| **Logging** | Winston | `^3.14.2` | Flexible transports, structured JSON logs | Pino — similar, but Winston's file rotation is simpler |
-| **AI SDK** | Anthropic SDK | `^0.30.1` | Official SDK, typed responses | Direct REST calls — more boilerplate, more error surface |
+| **Linting** | ESLint 9 + Prettier | `^9.11.1` | Flat config, strict rules enforced in CI | TSLint — deprecated by its maintainers |
 
 ---
 
@@ -219,18 +158,6 @@ export const useWorkflows = () => {
 
 **CI enforcement:** the build fails if `dist/assets/*.js` exceeds **200KB gzipped**.
 
-### 4.4 Clean Architecture for Backend
-
-The codebase separates concerns into distinct layers:
-
-- **`api/`** — Express controllers and routes. Thin: validates input shape, delegates to services, formats the HTTP response.
-- **`services/`** — Business logic (`WorkflowService`, `AIService`). No knowledge of `req`/`res`.
-- **`core/`** — `Orchestrator`, the state machine that drives a run from step to step.
-- **`models/`** — Mongoose schemas (`Workflow`, `WorkflowRun`) with their own validation rules and pre-save hooks.
-- **`config/`** — Centralized, Zod-validated environment access. This is the only layer allowed to read `process.env` directly.
-- **`queues/` / `workers/`** — BullMQ queue definition and the worker process that consumes jobs.
-- **`utils/`** — Logger (Winston), error handling (`AppError`), AI-mode state, redaction helpers.
-
 ---
 
 ## ⚙️ 5. Prerequisites
@@ -239,8 +166,6 @@ The codebase separates concerns into distinct layers:
 |---|---|---|---|
 | Node.js | `>=20.0.0` | `node --version` | Runtime |
 | npm | `>=10.0.0` | `npm --version` | Package manager |
-| MongoDB | `>=6.0` | `mongod --version` | Primary database |
-| Redis | `>=7.0` | `redis-server --version` | Queue/cache |
 | Docker | `>=24.0` *(optional)* | `docker --version` | Full-stack local dev |
 
 > ⚠️ **Constraint:** the backend must be reachable at `http://localhost:5000`. The frontend shows a connection-error banner if the API is unreachable.
@@ -249,38 +174,27 @@ The codebase separates concerns into distinct layers:
 
 ## 🚀 6. Quick Start
 
-### One-Command Setup (Full Stack)
-
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/ai-workflow-orchestrator.git
+git clone https://github.com/your-org/ai-workflow-orchestrator.git
 cd ai-workflow-orchestrator
 
-# 2. Install all dependencies
-npm install
+# 2. Install frontend dependencies
+cd frontend
+npm ci                    # Requires the committed package-lock.json
 
 # 3. Configure environment
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+cp .env.example .env      # Edit VITE_API_BASE_URL if your backend port differs
 
-# Edit .env files — at minimum set MONGO_URI; leave AI_MODE=mock to avoid API costs
-
-# 4. Start MongoDB and Redis locally (however you normally run them)
-
-# 5. Start the backend
-cd backend
-npm run dev                 # → http://localhost:5000
-
-# 6. Start the frontend (in a new terminal)
-cd frontend
-npm run dev                 # → http://localhost:5173
+# 4. Run (backend must already be running on :5000)
+npm run dev                # Vite dev server → http://localhost:5173
 ```
 
 ### Docker alternative (full stack, one command)
 
 ```bash
 # From the project root
-docker-compose up frontend backend mongodb redis
+docker-compose up frontend backend postgres redis
 # Frontend:   http://localhost:5173
 # Backend API: http://localhost:5000
 ```
@@ -298,126 +212,59 @@ docker-compose up frontend backend mongodb redis
 | `npm run test:e2e` | Run end-to-end tests (Playwright) |
 | `npm run test:a11y` | Run accessibility checks (axe-core + Lighthouse) |
 
-### Backend-Specific Scripts
-
-```bash
-npm run build   # tsc -> dist/
-npm start       # node dist/app.js
-npm run dev     # nodemon src/app.ts
-```
-
-### Verify Everything Works
-
-```bash
-# Check backend health
-curl http://localhost:5000/health
-
-# Expected response:
-{
-  "status": "ok",
-  "services": {
-    "mongodb": { "status": "connected" },
-    "redis": { "status": "connected" },
-    "ai": { "mode": "mock", "label": "🧪 Mock (Free - No Cost)" }
-  }
-}
-```
-
 ---
 
 ## 📂 7. Project Structure
 
-### Monorepo Structure
-
 ```
-ai-workflow-orchestrator/
-├── 📂 backend/                          # Backend (Node.js + Express)
-│   ├── src/
-│   │   ├── api/                         # Controllers & Routes
-│   │   │   ├── controllers/
-│   │   │   │   ├── workflow.controller.ts
-│   │   │   │   ├── settings.controller.ts
-│   │   │   │   └── AISettings.ts        # (Legacy, not wired)
-│   │   │   └── routes.ts                # All route definitions
-│   │   ├── config/                      # Environment & Service Config
-│   │   │   ├── schema.ts                # Zod schema — single source of truth
-│   │   │   ├── env.ts                   # Validated env loader
-│   │   │   ├── ai.config.ts
-│   │   │   ├── database.config.ts
-│   │   │   ├── redis.config.ts
-│   │   │   ├── types.ts
-│   │   │   └── index.ts                 # Public barrel export
-│   │   ├── core/                        # Business Logic Core
-│   │   │   └── StateMachine.orchestrator.ts
-│   │   ├── models/                      # Mongoose Schemas
-│   │   │   ├── Workflow.model.ts
-│   │   │   └── WorkflowRun.model.ts
-│   │   ├── queues/                      # BullMQ Definitions
-│   │   │   └── run.queue.ts
-│   │   ├── services/                    # Application Layer
-│   │   │   ├── workflow.service.ts
-│   │   │   └── ai.service.ts
-│   │   ├── utils/                       # Helpers
-│   │   │   ├── logger.ts
-│   │   │   ├── errorHandler.ts
-│   │   │   ├── aiMode.ts
-│   │   │   └── redact.ts
-│   │   ├── workers/                     # BullMQ Workers
-│   │   │   └── run.worker.ts
-│   │   └── app.ts                       # Express bootstrap
-│   ├── .env.example
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── 📂 frontend/                         # Frontend (React + Vite)
-│   ├── src/
-│   │   ├── api/                         # Axios Client
-│   │   │   └── client.ts
-│   │   ├── features/                    # Feature-Based Isolation
-│   │   │   ├── dashboard/               # Dashboard
-│   │   │   │   ├── components/
-│   │   │   │   └── constants/
-│   │   │   ├── settings/                # AI Settings
-│   │   │   │   └── components/
-│   │   │   └── workflows/               # Workflow Builder + Inbox
-│   │   │       ├── components/
-│   │   │       ├── constants/
-│   │   │       └── hooks/
-│   │   ├── hooks/                       # React Query Hooks
-│   │   │   └── useWorkflows.ts
-│   │   ├── store/                       # Zustand Store
-│   │   │   └── useWorkflowStore.ts
-│   │   ├── types/                       # Shared TypeScript Definitions
-│   │   │   └── index.ts
-│   │   ├── App.tsx
-│   │   ├── index.css
-│   │   └── main.tsx
-│   ├── .env.example
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── tsconfig.json
-│
-├── 📂 docs/                             # Additional Documentation
-│   ├── adr/                             # Architecture Decision Records
-│   ├── api/                             # OpenAPI Documentation
-│   └── runbooks/                        # Operational Runbooks
-│
-├── 📂 assets/                           # Project Images
-│   ├── dashboard.png
-│   ├── inbox.png
-│   ├── workflow-builder.png
-│   ├── ai-settings.png
-│   ├── execute-workflow.png
-│   └── run-status.png
-│
-├── 📜 .github/workflows/ci.yml          # CI/CD Pipeline
-├── 📜 CONTRIBUTING.md                   # Contribution Guide
-├── 📜 SECURITY.md                       # Security Policy
-├── 📜 CODE_OF_CONDUCT.md                # Code of Conduct
-├── 📜 LICENSE
-└── 📜 README.md                         # This file
+frontend/
+├── src/
+│   ├── api/
+│   │   └── client.ts               # Axios instance + interceptors + retry
+│   ├── components/                 # Shared UI primitives (Button, Modal, etc.)
+│   ├── features/                   # Feature-based isolation
+│   │   ├── dashboard/
+│   │   │   ├── components/
+│   │   │   │   ├── Dashboard.tsx
+│   │   │   │   ├── PendingApprovalsCard.tsx
+│   │   │   │   ├── RecentRunsTable.tsx
+│   │   │   │   ├── StatCard.tsx
+│   │   │   │   └── StatusBadge.tsx
+│   │   │   └── constants/
+│   │   │       └── statusConfig.ts     # Single source of truth for status colors
+│   │   ├── settings/
+│   │   │   └── components/
+│   │   │       ├── AISettings.tsx
+│   │   │       ├── ModeCard.tsx
+│   │   │       └── StatusBadge.tsx
+│   │   └── workflows/
+│   │       ├── components/
+│   │       │   ├── ExecuteWorkflowModal.tsx
+│   │       │   ├── Inbox.tsx
+│   │       │   ├── StatusBadge.tsx
+│   │       │   ├── StepEditor.tsx
+│   │       │   ├── WorkflowBuilder.tsx
+│   │       │   ├── WorkflowForm.tsx
+│   │       │   └── WorkflowList.tsx
+│   │       ├── constants/
+│   │       │   ├── statusConfig.ts
+│   │       │   └── workflowDefaults.ts
+│   │       └── hooks/
+│   │           └── usePendingApprovalActions.ts
+│   ├── hooks/
+│   │   └── useWorkflows.ts         # React Query hooks (server state)
+│   ├── store/
+│   │   └── useWorkflowStore.ts     # Zustand store (client state, 3 slices)
+│   ├── types/
+│   │   └── index.ts                # Shared TypeScript definitions
+│   ├── App.tsx
+│   ├── index.css                   # Tailwind directives + CSS variables
+│   └── main.tsx                    # Entry point
+├── .env.example
+├── index.html
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
 ```
 
 **Architectural principles**
@@ -433,7 +280,7 @@ ai-workflow-orchestrator/
 ### 8.1 Axios instance with interceptors
 
 ```typescript
-// frontend/src/api/client.ts
+// src/api/client.ts
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const client = axios.create({
@@ -479,7 +326,7 @@ export default client;
 ### 8.2 React Query integration
 
 ```typescript
-// frontend/src/hooks/useWorkflows.ts
+// src/hooks/useWorkflows.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 
@@ -498,6 +345,7 @@ export const useExecuteWorkflow = () => {
   return useMutation({
     mutationFn: (id: string) => api.post(`/workflows/${id}/execute`),
     onSuccess: () => {
+      // Invalidate and refetch after execution
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
@@ -521,7 +369,7 @@ export const useExecuteWorkflow = () => {
 ### 9.1 Zustand store (3 slices)
 
 ```typescript
-// frontend/src/store/useWorkflowStore.ts
+// src/store/useWorkflowStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
@@ -560,7 +408,7 @@ export const useWorkflowStore = create<UIState & WorkflowState>()(
       partialize: (state) => ({
         theme: state.theme,
         sidebarOpen: state.sidebarOpen,
-      }),
+      }), // Only UI preferences are persisted
     }
   )
 );
@@ -582,7 +430,7 @@ export const useWorkflowStore = create<UIState & WorkflowState>()(
 ### Example unit test
 
 ```typescript
-// frontend/src/features/workflows/components/__tests__/StatusBadge.test.tsx
+// src/features/workflows/components/__tests__/StatusBadge.test.tsx
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import StatusBadge from '../StatusBadge';
@@ -614,8 +462,6 @@ describe('StatusBadge', () => {
 | Bundle Size (total) | < 200KB | **178KB** | `vite-bundle-visualizer` | 2026-07-01 |
 | First Load JS | < 150KB | **142KB** | `vite-bundle-visualizer` | 2026-07-01 |
 | Test Suite Runtime | < 30s | **2.1s** | Vitest CLI | 2026-07-01 |
-| API Response Time (p95) | < 500ms | **340ms** | Prometheus | 2026-07-01 |
-| Queue Job Success Rate | > 99% | **99.95%** | BullMQ Dashboard | 2026-07-01 |
 
 > **CI enforcement:** the build fails if the bundle exceeds **200KB gzipped**. All figures above are reproducible via the commands in [§6](#-6-quick-start) and are re-measured on every release.
 
@@ -623,47 +469,17 @@ describe('StatusBadge', () => {
 
 ## 🌍 12. Environment Variables
 
-### Backend Variables
-
-| Variable | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `NODE_ENV` | enum | No | `development` | `development \| staging \| production \| test` |
-| `MONGO_URI` | string | **Yes** | — | Must start with `mongodb://` or `mongodb+srv://` |
-| `MONGO_MAX_POOL_SIZE` | number | No | `10` | |
-| `MONGO_MIN_POOL_SIZE` | number | No | `2` | |
-| `MONGO_SOCKET_TIMEOUT_MS` | number | No | `45000` | |
-| `MONGO_SERVER_SELECTION_TIMEOUT_MS` | number | No | `5000` | |
-| `MONGO_CONNECT_RETRIES` | number | No | `5` | |
-| `MONGO_CONNECT_RETRY_DELAY_MS` | number | No | `2000` | |
-| `REDIS_HOST` | string | No | `localhost` | |
-| `REDIS_PORT` | number | No | `6379` | |
-| `REDIS_PASSWORD` | string | No | — | |
-| `REDIS_TLS` | `'true' \| 'false'` | No | `'false'` | Enforced as literal enum, not coerced boolean |
-| `REDIS_MAX_RETRIES_PER_REQUEST` | number | No | `3` | |
-| `REDIS_CONNECT_TIMEOUT_MS` | number | No | `10000` | |
-| `ANTHROPIC_API_KEY` | string | Conditional | — | Required only when `AI_MODE=real` |
-| `AI_MODEL` | string | No | `claude-3-5-sonnet-20241022` | |
-| `AI_MAX_TOKENS` | number | No | `1024` | |
-| `AI_TEMPERATURE` | number | No | `0.3` | |
-| `AI_MODE` | enum | No | `mock` | `mock \| real` |
-| `AI_MOCK_DELAY` | number | No | `500` | |
-| `SLACK_WEBHOOK_URL` | string | No | — | |
-| `FRONTEND_URL` | string | No | `http://localhost:5173` | CORS origin |
-
-### Frontend Variables
-
-| Variable | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `VITE_API_BASE_URL` | `string` | Yes | `'/api'` | Backend API base URL |
-| `VITE_API_TIMEOUT` | `number` | No | `30000` | Request timeout (ms) |
-| `VITE_APP_NAME` | `string` | No | `'AI Orchestrator'` | App display name |
-| `VITE_APP_VERSION` | `string` | No | `'1.0.0'` | App version |
-| `VITE_ENABLE_DEVTOOLS` | `boolean` | No | `'false'` | Enable React Query DevTools |
+| Variable | Type | Required | Default | Description | Example |
+|---|---|---|---|---|---|
+| `VITE_API_BASE_URL` | `string` | Yes | `'/api'` | Backend API base URL | `'http://localhost:5000/api'` |
+| `VITE_API_TIMEOUT` | `number` | No | `30000` | Request timeout (ms) | `15000` |
+| `VITE_APP_NAME` | `string` | No | `'AI Orchestrator'` | App display name | `'AI Workflow Orchestrator'` |
+| `VITE_APP_VERSION` | `string` | No | `'1.0.0'` | App version | `'1.0.0-beta'` |
+| `VITE_ENABLE_DEVTOOLS` | `boolean` | No | `'false'` | Enable React Query DevTools | `'true'` |
 
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-# Edit values, then restart
+cp .env.example .env
+# Edit values, then restart the dev server
 ```
 
 ---
@@ -678,7 +494,6 @@ cp frontend/.env.example frontend/.env
 | **Input validation** | Zod schemas validate every form input before API submission |
 | **XSS** | React's automatic escaping; `dangerouslySetInnerHTML` is banned by ESLint |
 | **Dependencies** | `npm audit` runs in CI, plus weekly Dependabot scans |
-| **Data Redaction** | Winston logger redacts keys matching `password`, `token`, `secret`, `apiKey` |
 
 > ⚠️ **Known gap:** JWT authentication is not yet fully implemented. The current `x-user-id` header is a temporary measure, tracked in issue [#67](https://github.com/your-org/ai-workflow-orchestrator/issues/67).
 
@@ -829,12 +644,6 @@ Starting bundle: 420KB. Final bundle: 178KB, via:
 - Route-based code splitting (**-120KB** on initial load)
 - Component memoization (**-44** re-renders on the dashboard)
 
-### 16.4 Backend Lessons
-
-- **AI mode is process-global, in-memory state.** `POST /api/settings/ai-mode` mutates a module-level variable in `utils/aiMode.ts`. It is not persisted, not per-user, and will reset on restart or diverge across multiple worker/API instances if you scale horizontally.
-- **Tool execution is mocked.** `send_email`, `create_calendar_event`, and `create_jira_ticket` do not call Gmail/Calendar/Jira — they return synthetic success payloads after a short delay.
-- **Environment validation pays off.** The Zod schema catches missing or malformed env vars at boot, preventing runtime surprises.
-
 ---
 
 ## 🗺️ 17. Roadmap
@@ -844,8 +653,6 @@ Starting bundle: 420KB. Final bundle: 178KB, via:
 - [ ] Add optimistic UI updates across all workflow mutations
 - [ ] Expand E2E coverage to all critical approval paths
 - [ ] Publish a public Storybook for shared UI primitives
-- [ ] Add real integrations for Gmail, Google Calendar, and Jira
-- [ ] Implement persistent AI mode per user/tenant
 
 > Have a feature request? Open an issue using the `feat` label — see [§15](#-15-contributing).
 
@@ -860,19 +667,16 @@ Starting bundle: 420KB. Final bundle: 178KB, via:
 | `404 Not Found` | Backend down or wrong `VITE_API_BASE_URL` | Check backend status, verify `.env` |
 | `Failed to execute workflow` | Invalid context or orchestrator error | Check backend logs |
 | `Invalid hook call` | Hook used outside a React component | Ensure hooks are only called inside components or custom hooks |
-| `Invalid environment configuration` | Required env var missing or malformed | Read the printed Zod issue list — it names the exact field and rule that failed |
-| `Redis not initialized` | Something called `getRedisClient()` before `initializeRedis()` ran | Should not happen via the normal `startServer()` path; check for out-of-order imports |
-| Approve/reject returns `Run is not waiting for approval` | Run already moved past that step | Re-fetch run status via `GET /api/runs/:id` before acting on stale UI state |
-| Workflow update throws `Cannot update workflow with N pending runs` | Update blocked by design while runs are in flight | Wait for runs to finish, or create a new workflow |
+| `npm ci` fails | `package-lock.json` missing or outdated | Run `npm install` to regenerate it, then commit the lockfile |
 
 ---
 
 ## 📄 19. License
 
-- **License:** [MIT](LICENSE)
+- **License:** [MIT](../../LICENSE)
 - **Owner:** [Your Name / Company]
-- **Last Updated:** 2026-07-11
-- **Contributors:** see [CONTRIBUTORS.md](CONTRIBUTORS.md)
+- **Last Updated:** 2026-07-08
+- **Contributors:** see [CONTRIBUTORS.md](../../CONTRIBUTORS.md)
 
 ---
 
@@ -880,20 +684,16 @@ Starting bundle: 420KB. Final bundle: 178KB, via:
 
 | Document | Path |
 |---|---|
-| **Backend README** | [./backend/README.md](./backend/README.md) |
-| **Frontend README** | [./frontend/README.md](./frontend/README.md) |
-| **API Documentation** | [./docs/api.md](./docs/api.md) |
-| **Architecture Decisions** | [./docs/adr/](./docs/adr/) |
-| **Changelog** | [./CHANGELOG.md](./CHANGELOG.md) |
-| **Security Policy** | [./SECURITY.md](./SECURITY.md) |
-| **Code of Conduct** | [./CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) |
+| **Root README** | [../README.md](../README.md) |
+| **Backend README** | [../backend/README.md](../backend/README.md) |
+| **API Documentation** | [../docs/api.md](../docs/api.md) |
+| **Architecture Decisions** | [../docs/adr/](../docs/adr/) |
+| **Changelog** | [../CHANGELOG.md](../CHANGELOG.md) |
 
 ---
 
 <div align="center">
 
-Made with ⚛️ React, 🟦 TypeScript, 🟩 Node.js, and a strong opinion about not duplicating server state.
+Made with ⚛️ React, 🟦 TypeScript, and a strong opinion about not duplicating server state.
 
 </div>
-
-```

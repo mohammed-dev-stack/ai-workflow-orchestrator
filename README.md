@@ -1,21 +1,13 @@
-```markdown
 <div align="center">
 
-# 🤖 AI Workflow Orchestrator
+# 🤖 AI Workflow Orchestrator — Frontend
 
 **Human-in-the-loop automation platform — AI proposes, humans decide.**
 
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-5.4.8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
-[![Express](https://img.shields.io/badge/Express-4.22-000000?logo=express&logoColor=white)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-6.x-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![BullMQ](https://img.shields.io/badge/BullMQ-5.79-FF6B6B)](https://bullmq.io/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4.13-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6.2-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-[Overview](#-1-overview) · [Architecture](#-2-architecture) · [Tech Stack](#-3-tech-stack--decisions) · [Quick Start](#-6-quick-start) · [Contributing](#-15-contributing)
+[Overview](#-1-overview) · [Architecture](#-2-architecture)
 
 </div>
 

@@ -1,50 +1,28 @@
-<div align="center">
+<p align="center">
+  <strong>🤖 AI Workflow Orchestrator</strong><br/>
+  Human-in-the-loop automation platform — AI proposes, humans decide.
+</p>
 
-# 🤖 AI Workflow Orchestrator — Frontend
-
-**Human-in-the-loop automation platform — AI proposes, humans decide.**
-
-[![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6.2-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Vite](https://img.shields.io/badge/Vite-5.4.8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
-[![TanStack Query](https://img.shields.io/badge/TanStack%20Query-5.56.2-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4.13-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](#-10-testing-strategy)
-[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-brightgreen)](#-10-testing-strategy)
-[![Bundle Size](https://img.shields.io/badge/bundle-178KB%20gzip-success)](#-11-performance-measured-not-estimated)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../../LICENSE)
-
-[Overview](#-1-overview) · [Architecture](#-2-architecture) · [Tech Stack](#-3-tech-stack--decisions) · [Quick Start](#-6-quick-start) · [Testing](#-10-testing-strategy) · [Contributing](#-15-contributing)
-
-</div>
+<p align="center">
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white" alt="React"/></a>
+  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.6.2-3178C6?logo=typescript&logoColor=white" alt="TypeScript"/></a>
+  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-5.4.8-646CFF?logo=vite&logoColor=white" alt="Vite"/></a>
+</p>
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-1. [Overview](#-1-overview)
-2. [Architecture](#-2-architecture)
-3. [Tech Stack & Decisions](#-3-tech-stack--decisions)
-4. [Why We Made These Choices](#-4-why-we-made-these-choices)
-5. [Prerequisites](#-5-prerequisites)
-6. [Quick Start](#-6-quick-start)
-7. [Project Structure](#-7-project-structure)
-8. [API Client Architecture](#-8-api-client-architecture)
-9. [State Management](#-9-state-management)
-10. [Testing Strategy](#-10-testing-strategy)
-11. [Performance (Measured, Not Estimated)](#-11-performance-measured-not-estimated)
-12. [Environment Variables](#-12-environment-variables)
-13. [Security](#-13-security)
-14. [Git Workflow & Conventional Commits](#-14-git-workflow--conventional-commits)
-15. [Contributing](#-15-contributing)
-16. [Lessons Learned](#-16-lessons-learned)
-17. [Roadmap](#-17-roadmap)
-18. [Troubleshooting](#-18-troubleshooting)
-19. [License](#-19-license)
-20. [Navigation](#-20-navigation)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Quick Start](#quick-start)
 
 ---
 
+## Overview
+
+...
 ## 📋 1. Overview
 
 **AI Workflow Orchestrator** is a human-in-the-loop automation platform: the AI proposes actions, and a human reviews, approves, or rejects every sensitive operation before it runs. This repository contains the **frontend application**.

@@ -10,7 +10,6 @@
 [Overview](#-1-overview) · [Architecture](#-2-architecture)
 
 </div>
-
 ---
 
 ## 📋 Table of Contents
@@ -362,7 +361,7 @@ ai-workflow-orchestrator/
 │
 ├── 📜 .gitignore
 ├── 📜 docker-compose.yml
-├── 📜 LICENSE
+├── 📜 LICENSE                           # (will be added)
 └── 📜 README.md                         # This file
 ```
 
@@ -808,9 +807,7 @@ Starting bundle: 420KB. Final bundle: 178KB, via:
 
 ## 📄 19. License
 
-- **License:** [MIT](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/blob/main/LICENSE)
-- **Owner:** Mohammed Dev Stack
-- **Last Updated:** 2026‑07‑11
+This project is licensed under the **MIT License** — see the [LICENSE](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/blob/main/LICENSE) file for details (to be added).
 
 ---
 
@@ -821,7 +818,7 @@ Starting bundle: 420KB. Final bundle: 178KB, via:
 | **Backend** | [./backend](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/tree/main/backend) |
 | **Frontend** | [./frontend](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/tree/main/frontend) |
 | **Docker Compose** | [./docker-compose.yml](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/blob/main/docker-compose.yml) |
-| **License** | [./LICENSE](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/blob/main/LICENSE) |
+| **License** | [./LICENSE](https://github.com/mohammed-dev-stack/ai-workflow-orchestrator/blob/main/LICENSE) *(to be added)* |
 
 ---
 

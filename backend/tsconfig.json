@@ -1,0 +1,112 @@
+{
+  "compilerOptions": {
+    // ============================================
+    //  ECMASCRIPT TARGET & MODULE
+    // ============================================
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    
+    // ============================================
+    //  OUTPUT & SOURCE MAPS
+    // ============================================
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    
+    // ============================================
+    //  STRICT TYPE CHECKING
+    // ============================================
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    
+    // ============================================
+    //  LINTING & QUALITY
+    // ============================================
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    
+    // ============================================
+    //  MODULE RESOLUTION & INTEROP (TypeScript 6+)
+    // ============================================
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    
+    // ============================================
+    //  PATHS & ALIASES (مع NodeNext)
+    // ============================================
+    // baseUrl غير مطلوب مع NodeNext
+    "paths": {
+      "@/*": ["./src/*"],
+      "@config/*": ["./src/config/*"],
+      "@core/*": ["./src/core/*"],
+      "@models/*": ["./src/models/*"],
+      "@services/*": ["./src/services/*"],
+      "@api/*": ["./src/api/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@workers/*": ["./src/workers/*"],
+      "@queues/*": ["./src/queues/*"]
+    },
+    
+    // ============================================
+    //  TYPES & DECLARATIONS
+    // ============================================
+    "types": ["jest", "node"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    
+    // ============================================
+    //  PERFORMANCE & OPTIMIZATION
+    // ============================================
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
+    "preserveWatchOutput": true,
+    
+    // ============================================
+    //  EXPERIMENTAL FEATURES
+    // ============================================
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  
+  // ============================================
+  //  FILE INCLUSION & EXCLUSION
+  // ============================================
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "logs"
+  ],
+  
+  // ============================================
+  //  WATCHER OPTIONS
+  // ============================================
+  "watchOptions": {
+    "watchFile": "priorityPollingInterval",
+    "watchDirectory": "dynamicPriorityPolling",
+    "excludeDirectories": ["**/node_modules", "**/dist", "**/logs"]
+  }
+}

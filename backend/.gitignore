@@ -1,0 +1,62 @@
+# dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# build output
+dist/
+build/
+lib/
+*.tsbuildinfo
+
+# environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# testing
+coverage/
+.nyc_output/
+test-results/
+
+# docker / volumes (if any)
+docker-data/
+mongodb-data/
+redis-data/
+
+# temporary files
+tmp/
+temp/
+*.tmp
+
+# sensitive data
+*.pem
+*.key
+*.crt
+*.p12
+
+# misc
+.cache/
+.eslintcache
+.prettiercache
+.parcel-cache

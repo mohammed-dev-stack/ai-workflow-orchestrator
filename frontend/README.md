@@ -617,7 +617,7 @@ Our initial bundle was 420KB. We fought it down to 178KB:
 ## 📄 18. License
 
 - **License:** [MIT](../../LICENSE)
-- **Owner:** [Your Name/Company]
+- **Owner:** [mohammed qannan]
 - **Last Updated:** 2026-07-08
 - **Contributors:** See [CONTRIBUTORS.md](../../CONTRIBUTORS.md)
 
@@ -633,20 +633,3 @@ Our initial bundle was 420KB. We fought it down to 178KB:
 | **Architecture Decisions** | [../docs/adr/](../docs/adr/) |
 | **Changelog** | [../CHANGELOG.md](../CHANGELOG.md) |
 ```
-
----
-
-## ملخص التحسينات الرئيسية
-
-| السلبية في الملف الأصلي | الحل في الملف الجديد |
-|------------------------|---------------------|
-| عبارات AI فضفاضة ("أفضل الممارسات العالمية") | حُذفت تماماً |
-| أرقام Performance بدون مصدر | أرقام مُقاسة مع التاريخ والأداة |
-| غياب الكود الحقيقي | كود Axios interceptors + React Query + Zustand |
-| غياب قصص القرارات | أقسام "Why We Made These Choices" + "Lessons Learned" |
-| FID (مقياس منتهي الصلاحية) | استبدل بـ INP |
-| غياب Commits الاحترافية | قسم كامل مع أمثلة حقيقية + commitlint config |
-| `npm ci` بدون ذكر `package-lock.json` | أُضيف التوضيح |
-| JWT "قيد التنفيذ" بدون تتبع | رقم issue #67 |
-| غياب ADRs | روابط لـ ADRs موجودة |
-| غياب Bundle optimization journey | قسم كامل مع أرقام قبل/بعد |

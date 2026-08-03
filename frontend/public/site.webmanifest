@@ -1,0 +1,8 @@
+{
+  "name": "WhatsApp AI Agent",
+  "short_name": "AI Agent",
+  "icons": [],
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone"
+}

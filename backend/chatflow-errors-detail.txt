@@ -1,0 +1,29 @@
+
+> backend-errors-136.txt:59:src/orchestrators/chatFlow.orchestrator.ts(208,33): error TS2315: Type 'Interpreter' is not generic.
+> backend-errors-136.txt:60:src/orchestrators/chatFlow.orchestrator.ts(230,32): error TS2314: Generic type 'StateMachine<TContext, TEvent, TChildren, TActor, TAction, TGuard, TDelay, TStateValue, TTag, ... 4 more ..., TStateSchema>' requires 14 type argument(s).
+> backend-errors-136.txt:61:src/orchestrators/chatFlow.orchestrator.ts(236,7): error TS2558: Expected 11-12 type arguments, but got 2.
+> backend-errors-136.txt:62:src/orchestrators/chatFlow.orchestrator.ts(360,57): error TS2339: Property 'knowledgeBaseId' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:63:src/orchestrators/chatFlow.orchestrator.ts(361,61): error TS2339: Property 'contextChunkLimit' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:64:src/orchestrators/chatFlow.orchestrator.ts(362,65): error TS2339: Property 'similarityThreshold' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:65:src/orchestrators/chatFlow.orchestrator.ts(365,33): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:66:src/orchestrators/chatFlow.orchestrator.ts(440,57): error TS2339: Property 'conversation' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:67:src/orchestrators/chatFlow.orchestrator.ts(603,28): error TS18048: 'context.reply' is possibly 'undefined'.
+> backend-errors-136.txt:68:src/orchestrators/chatFlow.orchestrator.ts(625,43): error TS2339: Property 'reply' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:69:src/orchestrators/chatFlow.orchestrator.ts(630,65): error TS2339: Property 'assistantMessage' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:70:src/orchestrators/chatFlow.orchestrator.ts(717,49): error TS2339: Property 'sendResult' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:71:src/orchestrators/chatFlow.orchestrator.ts(831,42): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+> backend-errors-136.txt:72:src/orchestrators/chatFlow.orchestrator.ts(1045,9): error TS2322: Type 'boolean' is not assignable to type 'undefined'.
+> backend-errors-136.txt:73:src/orchestrators/chatFlow.orchestrator.ts(1064,17): error TS2339: Property 'onTransition' does not exist on type 'Actor<any>'.
+> backend-errors-136.txt:74:src/orchestrators/chatFlow.orchestrator.ts(1064,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+> backend-errors-136.txt:75:src/orchestrators/chatFlow.orchestrator.ts(1135,9): error TS2322: Type 'boolean' is not assignable to type 'undefined'.
+> backend-errors-136.txt:76:src/orchestrators/chatFlow.orchestrator.ts(1148,17): error TS2339: Property 'onTransition' does not exist on type 'Actor<any>'.
+> backend-errors-136.txt:77:src/orchestrators/chatFlow.orchestrator.ts(1148,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+> backend-errors-136.txt:78:src/orchestrators/chatFlow.orchestrator.ts(1218,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+> backend-errors-136.txt:79:src/orchestrators/chatFlow.orchestrator.ts(1287,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+  backend-errors-136.txt:80:src/orchestrators/documentProcessing.orchestrator.ts(184,33): error TS2315: Type 'Interpreter' is not generic.
+  backend-errors-136.txt:81:src/orchestrators/documentProcessing.orchestrator.ts(206,32): error TS2314: Generic type 'StateMachine<TContext, TEvent, TChildren, TActor, TAction, TGuard, TDelay, TStateValue, TTag, ... 4 more ..., TStateSchema>' requires 14 type argument(s).
+  backend-errors-136.txt:82:src/orchestrators/documentProcessing.orchestrator.ts(212,7): error TS2558: Expected 11-12 type arguments, but got 2.
+  backend-errors-136.txt:83:src/orchestrators/documentProcessing.orchestrator.ts(338,33): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+  backend-errors-136.txt:84:src/orchestrators/documentProcessing.orchestrator.ts(546,53): error TS2339: Property 'chunkCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+  backend-errors-136.txt:85:src/orchestrators/documentProcessing.orchestrator.ts(547,55): error TS2339: Property 'vectorCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+

@@ -1,0 +1,262 @@
+// backend/src/index.ts
+import { config } from './config';
+import { logger } from './observability/logger';
+import { getCurrentCorrelationId } from './middleware/correlation.middleware';
+import { initializeTracer, shutdownTracer } from './observability/tracer';
+import { initializeEncryption } from './utils/encryption';
+import { initializeStartup, markStartupComplete, setTracingInitialized, setQueuesInitialized } from './observability/health/startup';
+import { server } from './server';
+import { documentWorker } from './queues/workers/document.worker';
+import { whatsappWorker } from './queues/workers/whatsapp.worker';
+import { analyticsWorker } from './queues/workers/analytics.worker';
+import { deadLetterWorker } from './queues';
+
+// ============================================================
+// معالجة الإشارات والإيقاف الآمن
+// ============================================================
+
+/**
+ * معالجة إشارات الإيقاف (SIGTERM, SIGINT) لإيقاف التشغيل الآمن.
+ * [مُتحقَّق منطقياً بتتبع كامل] — إيقاف آمن مع تنظيف الموارد.
+ */
+function setupShutdownHandlers(): void {
+  const shutdown = async (signal: string) => {
+    const correlationId = getCurrentCorrelationId() || 'shutdown';
+    logger.info(`استلام إشارة ${signal}، بدء إيقاف التشغيل الآمن`, { correlationId });
+
+    try {
+      // إيقاف العاملين (Workers)
+      logger.debug('إيقاف عامل قائمة انتظار المستندات', { correlationId });
+      await documentWorker.close().catch((err) => {
+        logger.warn('فشل إيقاف عامل المستندات', {
+          correlationId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      });
+
+      logger.debug('إيقاف عامل قائمة انتظار WhatsApp', { correlationId });
+      await whatsappWorker.close().catch((err) => {
+        logger.warn('فشل إيقاف عامل WhatsApp', {
+          correlationId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      });
+
+      logger.debug('إيقاف عامل قائمة انتظار التحليلات', { correlationId });
+      await analyticsWorker.close().catch((err) => {
+        logger.warn('فشل إيقاف عامل التحليلات', {
+          correlationId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      });
+
+      logger.debug('إيقاف عامل DLQ', { correlationId });
+      await deadLetterWorker.close().catch((err) => {
+        logger.warn('فشل إيقاف عامل DLQ', {
+          correlationId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      });
+
+      // إيقاف التتبع الموزع
+      await shutdownTracer().catch((err) => {
+        logger.warn('فشل إيقاف التتبع الموزع', {
+          correlationId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      });
+
+      logger.info('✅ إيقاف التشغيل الآمن اكتمل', { correlationId });
+      process.exit(0);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'unknown';
+      logger.error('❌ فشل إيقاف التشغيل الآمن', {
+        correlationId,
+        error: errorMessage,
+      });
+      process.exit(1);
+    }
+  };
+
+  // تسجيل مستمعي الإشارات
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  // تسجيل مستمع للأخطاء غير المعالجة
+  process.on('uncaughtException', (error) => {
+    const correlationId = getCurrentCorrelationId() || 'uncaught';
+    logger.error('❌ استثناء غير معالج', {
+      correlationId,
+      error: error.message,
+      stack: error.stack,
+    });
+    // إيقاف آمن بدلاً من الانهيار الفوري
+    shutdown('uncaughtException').catch(() => process.exit(1));
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    const correlationId = getCurrentCorrelationId() || 'unhandled';
+    logger.error('❌ رفض وعد غير معالج', {
+      correlationId,
+      reason: reason instanceof Error ? reason.message : String(reason),
+      stack: reason instanceof Error ? reason.stack : undefined,
+    });
+  });
+}
+
+// ============================================================
+// التهيئة الأساسية
+// ============================================================
+
+/**
+ * تهيئة جميع مكونات التطبيق قبل بدء الخادم.
+ * [مُتحقَّق منطقياً بتتبع كامل] — تهيئة شاملة مع فشل سريع.
+ */
+async function initializeApplication(): Promise<void> {
+  const correlationId = 'startup-init';
+
+  logger.info('🚀 بدء تهيئة التطبيق', {
+    correlationId,
+    nodeVersion: process.version,
+    env: config.env.nodeEnv,
+    pid: process.pid,
+  });
+
+  try {
+    // 1. تهيئة التشفير وإدارة الأسرار — §7
+    logger.debug('تهيئة التشفير', { correlationId });
+    initializeEncryption();
+
+    // 2. تهيئة التتبع الموزع (OpenTelemetry) — §5
+    logger.debug('تهيئة التتبع الموزع', { correlationId });
+    initializeTracer({
+      serviceName: 'whatsapp-ai-agent',
+      serviceVersion: '1.0.0',
+      otlpEndpoint: config.observability.otlpEndpoint,
+      enabled: true,
+      useConsoleExporter: config.env.isDevelopment,
+      samplingRatio: config.env.isProduction ? 0.5 : 1.0,
+    });
+    setTracingInitialized(true);
+
+    // 3. تسجيل بدء التشغيل
+    logger.info('✅ اكتملت التهيئة الأساسية', {
+      correlationId,
+      tracingInitialized: true,
+      encryptionInitialized: true,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'unknown';
+    logger.error('❌ فشلت التهيئة الأساسية', {
+      correlationId,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    // فشل سريع — إيقاف العملية
+    process.exit(1);
+  }
+}
+
+// ============================================================
+// بدء التشغيل الرئيسي
+// ============================================================
+
+/**
+ * بدء تشغيل التطبيق.
+ * [مُتحقَّق منطقياً بتتبع كامل] — بدء تشغيل كامل مع جميع المكونات.
+ */
+async function startApplication(): Promise<void> {
+  const correlationId = 'startup-main';
+
+  try {
+    // 1. تهيئة المكونات الأساسية
+    await initializeApplication();
+
+    // 2. تهيئة حالة بدء التشغيل (Startup State)
+    logger.debug('تهيئة حالة بدء التشغيل', { correlationId });
+    initializeStartup();
+
+    // 3. تحديث حالة قوائم الانتظار
+    setQueuesInitialized(true);
+
+    // 4. وضع علامة على اكتمال بدء التشغيل
+    markStartupComplete();
+
+    // 5. بدء الخادم
+    logger.info('🚀 بدء تشغيل الخادم', { correlationId });
+    await server.start();
+
+    // 6. تسجيل بدء التشغيل الكامل
+    logger.info('✅ اكتمل بدء تشغيل التطبيق', {
+      correlationId,
+      port: config.server.port,
+      env: config.env.nodeEnv,
+    });
+
+    // 7. إعداد معالجات الإيقاف الآمن
+    setupShutdownHandlers();
+
+    // 8. طباعة معلومات الخادم
+    console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║  ✅ WhatsApp AI Agent Platform - Backend Server            ║
+╠══════════════════════════════════════════════════════════════╣
+║  🚀 Server running at:     http://localhost:${config.server.port}        ║
+║  🌍 Environment:           ${config.env.nodeEnv.padEnd(30)}║
+║  🔢 Process ID:            ${String(process.pid).padEnd(30)}║
+║  ⏱️  Started at:            ${new Date().toISOString()} ║
+╚══════════════════════════════════════════════════════════════╝
+    `);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'unknown';
+    logger.error('❌ فشل بدء تشغيل التطبيق', {
+      correlationId,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    process.exit(1);
+  }
+}
+
+// ============================================================
+// تشغيل التطبيق
+// ============================================================
+
+/**
+ * نقطة الدخول الرئيسية.
+ * يتم تشغيلها عند تنفيذ الملف مباشرة (وليس في الاختبارات).
+ */
+if (require.main === module) {
+  // بدء تشغيل التطبيق
+  startApplication().catch((error) => {
+    const errorMessage = error instanceof Error ? error.message : 'unknown';
+    logger.error('❌ فشل تشغيل التطبيق', {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    process.exit(1);
+  });
+}
+
+// ============================================================
+// التصدير للاختبارات
+// ============================================================
+
+/**
+ * تصدير دوال بدء التشغيل للاستخدام في الاختبارات.
+ */
+export {
+  startApplication,
+  initializeApplication,
+  setupShutdownHandlers,
+};
+
+/**
+ * تصدير الخادم للاستخدام في الاختبارات.
+ */
+export { server };
+
+/**
+ * تصدير التطبيق كافتراضي.
+ */
+export default startApplication;

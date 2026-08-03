@@ -1,0 +1,33 @@
+
+> backend-errors-136.txt:1:src/db/index.ts(165,14): error TS2323: Cannot redeclare exported variable 'TenantRepository'.
+> backend-errors-136.txt:2:src/db/index.ts(292,14): error TS2323: Cannot redeclare exported variable 'UserRepository'.
+> backend-errors-136.txt:3:src/db/index.ts(382,14): error TS2323: Cannot redeclare exported variable 'KnowledgeBaseRepository'.
+> backend-errors-136.txt:4:src/db/index.ts(483,14): error TS2323: Cannot redeclare exported variable 'DocumentRepository'.
+> backend-errors-136.txt:5:src/db/index.ts(615,14): error TS2323: Cannot redeclare exported variable 'DocumentChunkRepository'.
+> backend-errors-136.txt:6:src/db/index.ts(682,14): error TS2323: Cannot redeclare exported variable 'ConversationRepository'.
+> backend-errors-136.txt:7:src/db/index.ts(784,14): error TS2323: Cannot redeclare exported variable 'MessageRepository'.
+> backend-errors-136.txt:8:src/db/index.ts(890,14): error TS2323: Cannot redeclare exported variable 'PromptTemplateRepository'.
+> backend-errors-136.txt:9:src/db/index.ts(959,3): error TS2323: Cannot redeclare exported variable 'TenantRepository'.
+> backend-errors-136.txt:10:src/db/index.ts(959,3): error TS2484: Export declaration conflicts with exported declaration of 'TenantRepository'.
+> backend-errors-136.txt:11:src/db/index.ts(960,3): error TS2323: Cannot redeclare exported variable 'UserRepository'.
+> backend-errors-136.txt:12:src/db/index.ts(960,3): error TS2484: Export declaration conflicts with exported declaration of 'UserRepository'.
+> backend-errors-136.txt:13:src/db/index.ts(961,3): error TS2323: Cannot redeclare exported variable 'KnowledgeBaseRepository'.
+> backend-errors-136.txt:14:src/db/index.ts(961,3): error TS2484: Export declaration conflicts with exported declaration of 'KnowledgeBaseRepository'.
+> backend-errors-136.txt:15:src/db/index.ts(962,3): error TS2323: Cannot redeclare exported variable 'DocumentRepository'.
+> backend-errors-136.txt:16:src/db/index.ts(962,3): error TS2484: Export declaration conflicts with exported declaration of 'DocumentRepository'.
+> backend-errors-136.txt:17:src/db/index.ts(963,3): error TS2323: Cannot redeclare exported variable 'DocumentChunkRepository'.
+> backend-errors-136.txt:18:src/db/index.ts(963,3): error TS2484: Export declaration conflicts with exported declaration of 'DocumentChunkRepository'.
+> backend-errors-136.txt:19:src/db/index.ts(964,3): error TS2323: Cannot redeclare exported variable 'ConversationRepository'.
+> backend-errors-136.txt:20:src/db/index.ts(964,3): error TS2484: Export declaration conflicts with exported declaration of 'ConversationRepository'.
+> backend-errors-136.txt:21:src/db/index.ts(965,3): error TS2323: Cannot redeclare exported variable 'MessageRepository'.
+> backend-errors-136.txt:22:src/db/index.ts(965,3): error TS2484: Export declaration conflicts with exported declaration of 'MessageRepository'.
+> backend-errors-136.txt:23:src/db/index.ts(966,3): error TS2323: Cannot redeclare exported variable 'PromptTemplateRepository'.
+> backend-errors-136.txt:24:src/db/index.ts(966,3): error TS2484: Export declaration conflicts with exported declaration of 'PromptTemplateRepository'.
+> backend-errors-136.txt:25:src/db/index.ts(975,3): error TS2305: Module '"../generated/prisma/index.js"' has no exported member 'UserStatus'.
+  backend-errors-136.txt:26:src/index.ts(4,41): error TS2307: Cannot find module './middleware/correlation.middleware' or its corresponding type declarations.
+  backend-errors-136.txt:27:src/index.ts(132,22): error TS2554: Expected 0 arguments, but got 1.
+  backend-errors-136.txt:28:src/middlewares/correlation.middleware.ts(80,38): error TS2345: Argument of type 'any[]' is not assignable to parameter of type '[chunk: any, encoding: BufferEncoding, cb?: (() => void) | undefined]'.
+  backend-errors-136.txt:29:  Target requires 2 element(s) but source may have fewer.
+  backend-errors-136.txt:30:src/middlewares/errorHandler.middleware.ts(182,25): error TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'.
+  backend-errors-136.txt:31:src/middlewares/errorHandler.middleware.ts(182,37): error TS7006: Parameter 'err' implicitly has an 'any' type.
+

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <!-- ============================================================
+    الترميز والتحميل
+    ============================================================ -->
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ============================================================
+    عنوان التطبيق ووصفه (SEO)
+    ============================================================ -->
+    <title>🤖 واتساب AI — مساعد المعرفة بالذكاء الاصطناعي</title>
+    <meta name="description" content="منصة متكاملة لإدارة قواعد المعرفة المدعومة بالذكاء الاصطناعي وأتمتة محادثات WhatsApp." />
+    <meta name="theme-color" content="#3b82f6" />
+
+    <!-- ============================================================
+    الخطوط (Fonts) — دعم اللغة العربية والتحسين البصري
+    ============================================================ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- ============================================================
+    الأيقونات (PWA / Favicon) — تحسين المظهر
+    ============================================================ -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- ============================================================
+    إعدادات PWA (Progressive Web App)
+    ============================================================ -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- ============================================================
+    Open Graph (لمشاركة الروابط)
+    ============================================================ -->
+    <meta property="og:title" content="🤖 واتساب AI — مساعد المعرفة بالذكاء الاصطناعي" />
+    <meta property="og:description" content="منصة متكاملة لإدارة قواعد المعرفة المدعومة بالذكاء الاصطناعي وأتمتة محادثات WhatsApp." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://whatsapp-ai.local" />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- ============================================================
+    أمان إضافي (CSP — Content Security Policy)
+    ملاحظة: يتم تطبيقه في الخادم أيضاً، هنا للتوثيق
+    ============================================================ -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:3000 https://api.anthropic.com;" /> -->
+
+    <!-- ============================================================
+    النمط الأساسي (لمنع وميض الشاشة قبل تحميل CSS)
+    ============================================================ -->
+    <style>
+        /* استعادة الوضع الليلي (إذا كان محفوظاً في localStorage) */
+        
+        html.dark {
+            background-color: #111827;
+        }
+        
+        html:not(.dark) {
+            background-color: #f9fafb;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- ============================================================
+    عنصر الجذر (Root) — يتم تحميل تطبيق React هنا
+    ============================================================ -->
+    <div id="root"></div>
+
+    <!-- ============================================================
+    تحميل التطبيق (Vite Entry Point)
+    ============================================================ -->
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

@@ -1,0 +1,191 @@
+src/db/index.ts(165,14): error TS2323: Cannot redeclare exported variable 'TenantRepository'.
+src/db/index.ts(292,14): error TS2323: Cannot redeclare exported variable 'UserRepository'.
+src/db/index.ts(382,14): error TS2323: Cannot redeclare exported variable 'KnowledgeBaseRepository'.
+src/db/index.ts(483,14): error TS2323: Cannot redeclare exported variable 'DocumentRepository'.
+src/db/index.ts(615,14): error TS2323: Cannot redeclare exported variable 'DocumentChunkRepository'.
+src/db/index.ts(682,14): error TS2323: Cannot redeclare exported variable 'ConversationRepository'.
+src/db/index.ts(784,14): error TS2323: Cannot redeclare exported variable 'MessageRepository'.
+src/db/index.ts(890,14): error TS2323: Cannot redeclare exported variable 'PromptTemplateRepository'.
+src/db/index.ts(959,3): error TS2323: Cannot redeclare exported variable 'TenantRepository'.
+src/db/index.ts(959,3): error TS2484: Export declaration conflicts with exported declaration of 'TenantRepository'.
+src/db/index.ts(960,3): error TS2323: Cannot redeclare exported variable 'UserRepository'.
+src/db/index.ts(960,3): error TS2484: Export declaration conflicts with exported declaration of 'UserRepository'.
+src/db/index.ts(961,3): error TS2323: Cannot redeclare exported variable 'KnowledgeBaseRepository'.
+src/db/index.ts(961,3): error TS2484: Export declaration conflicts with exported declaration of 'KnowledgeBaseRepository'.
+src/db/index.ts(962,3): error TS2323: Cannot redeclare exported variable 'DocumentRepository'.
+src/db/index.ts(962,3): error TS2484: Export declaration conflicts with exported declaration of 'DocumentRepository'.
+src/db/index.ts(963,3): error TS2323: Cannot redeclare exported variable 'DocumentChunkRepository'.
+src/db/index.ts(963,3): error TS2484: Export declaration conflicts with exported declaration of 'DocumentChunkRepository'.
+src/db/index.ts(964,3): error TS2323: Cannot redeclare exported variable 'ConversationRepository'.
+src/db/index.ts(964,3): error TS2484: Export declaration conflicts with exported declaration of 'ConversationRepository'.
+src/db/index.ts(965,3): error TS2323: Cannot redeclare exported variable 'MessageRepository'.
+src/db/index.ts(965,3): error TS2484: Export declaration conflicts with exported declaration of 'MessageRepository'.
+src/db/index.ts(966,3): error TS2323: Cannot redeclare exported variable 'PromptTemplateRepository'.
+src/db/index.ts(966,3): error TS2484: Export declaration conflicts with exported declaration of 'PromptTemplateRepository'.
+src/db/index.ts(975,3): error TS2305: Module '"../generated/prisma/index.js"' has no exported member 'UserStatus'.
+src/index.ts(4,41): error TS2307: Cannot find module './middleware/correlation.middleware' or its corresponding type declarations.
+src/index.ts(132,22): error TS2554: Expected 0 arguments, but got 1.
+src/middlewares/correlation.middleware.ts(80,38): error TS2345: Argument of type 'any[]' is not assignable to parameter of type '[chunk: any, encoding: BufferEncoding, cb?: (() => void) | undefined]'.
+  Target requires 2 element(s) but source may have fewer.
+src/middlewares/errorHandler.middleware.ts(182,25): error TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'.
+src/middlewares/errorHandler.middleware.ts(182,37): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/middlewares/logging.middleware.ts(123,35): error TS2532: Object is possibly 'undefined'.
+src/middlewares/logging.middleware.ts(124,31): error TS2532: Object is possibly 'undefined'.
+src/middlewares/logging.middleware.ts(291,38): error TS2345: Argument of type 'any[]' is not assignable to parameter of type '[chunk: any, encoding: BufferEncoding, cb?: (() => void) | undefined]'.
+  Target requires 2 element(s) but source may have fewer.
+src/models/prisma/client.ts(31,50): error TS2694: Namespace '"C:/Users/Shamia/Desktop/ai-knowledge-orchestrator/backend/src/generated/prisma/index".Prisma' has no exported member 'Middleware'.
+src/models/prisma/client.ts(32,17): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/models/prisma/client.ts(32,25): error TS7006: Parameter 'next' implicitly has an 'any' type.
+src/models/prisma/client.ts(113,50): error TS2694: Namespace '"C:/Users/Shamia/Desktop/ai-knowledge-orchestrator/backend/src/generated/prisma/index".Prisma' has no exported member 'Middleware'.
+src/models/prisma/client.ts(114,17): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/models/prisma/client.ts(114,25): error TS7006: Parameter 'next' implicitly has an 'any' type.
+src/models/prisma/client.ts(168,7): error TS2353: Object literal may only specify known properties, and 'datasources' does not exist in type 'PrismaClientOptions'.
+src/models/prisma/client.ts(191,12): error TS2339: Property '$use' does not exist on type 'PrismaClient<{ errorFormat?: ErrorFormat | undefined; log?: (LogLevel | LogDefinition)[] | undefined; transactionOptions?: { maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: TransactionIsolationLevel | undefined; } | undefined; adapter?: SqlDriverAdapterFactory | undefined; accelerateUrl?...'.
+src/models/prisma/client.ts(194,12): error TS2339: Property '$use' does not exist on type 'PrismaClient<{ errorFormat?: ErrorFormat | undefined; log?: (LogLevel | LogDefinition)[] | undefined; transactionOptions?: { maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: TransactionIsolationLevel | undefined; } | undefined; adapter?: SqlDriverAdapterFactory | undefined; accelerateUrl?...'.
+src/models/prisma/client.ts(197,12): error TS2339: Property '$use' does not exist on type 'PrismaClient<{ errorFormat?: ErrorFormat | undefined; log?: (LogLevel | LogDefinition)[] | undefined; transactionOptions?: { maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: TransactionIsolationLevel | undefined; } | undefined; adapter?: SqlDriverAdapterFactory | undefined; accelerateUrl?...'.
+src/models/prisma/client.ts(197,24): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/models/prisma/client.ts(197,32): error TS7006: Parameter 'next' implicitly has an 'any' type.
+src/models/prisma/client.ts(292,46): error TS2305: Module '"@prisma/client"' has no exported member 'UserStatus'.
+src/observability/health/startup.ts(146,13): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/observability/metrics.ts(96,21): error TS2345: Argument of type '{ [x: string]: number | undefined; }' is not assignable to parameter of type 'Record<string, string | number | boolean>'.
+  'string' index signatures are incompatible.
+    Type 'number | undefined' is not assignable to type 'string | number | boolean'.
+      Type 'undefined' is not assignable to type 'string | number | boolean'.
+src/observability/metrics.ts(327,38): error TS18048: 'name' is possibly 'undefined'.
+src/observability/metrics.ts(335,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/observability/tracer.ts(28,19): error TS2693: 'Resource' only refers to a type, but is being used as a value here.
+src/observability/tracer.ts(30,60): error TS2339: Property 'app' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/orchestrators/chatFlow.orchestrator.ts(208,33): error TS2315: Type 'Interpreter' is not generic.
+src/orchestrators/chatFlow.orchestrator.ts(230,32): error TS2314: Generic type 'StateMachine<TContext, TEvent, TChildren, TActor, TAction, TGuard, TDelay, TStateValue, TTag, ... 4 more ..., TStateSchema>' requires 14 type argument(s).
+src/orchestrators/chatFlow.orchestrator.ts(236,7): error TS2558: Expected 11-12 type arguments, but got 2.
+src/orchestrators/chatFlow.orchestrator.ts(360,57): error TS2339: Property 'knowledgeBaseId' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(361,61): error TS2339: Property 'contextChunkLimit' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(362,65): error TS2339: Property 'similarityThreshold' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(365,33): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(440,57): error TS2339: Property 'conversation' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(603,28): error TS18048: 'context.reply' is possibly 'undefined'.
+src/orchestrators/chatFlow.orchestrator.ts(625,43): error TS2339: Property 'reply' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(630,65): error TS2339: Property 'assistantMessage' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(717,49): error TS2339: Property 'sendResult' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(831,42): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<ChatFlowContext, ChatFlowEvent, ChatFlowEvent, ProvidedActor>'.
+src/orchestrators/chatFlow.orchestrator.ts(1045,9): error TS2322: Type 'boolean' is not assignable to type 'undefined'.
+src/orchestrators/chatFlow.orchestrator.ts(1064,17): error TS2339: Property 'onTransition' does not exist on type 'Actor<any>'.
+src/orchestrators/chatFlow.orchestrator.ts(1064,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/chatFlow.orchestrator.ts(1135,9): error TS2322: Type 'boolean' is not assignable to type 'undefined'.
+src/orchestrators/chatFlow.orchestrator.ts(1148,17): error TS2339: Property 'onTransition' does not exist on type 'Actor<any>'.
+src/orchestrators/chatFlow.orchestrator.ts(1148,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/chatFlow.orchestrator.ts(1218,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/chatFlow.orchestrator.ts(1287,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/documentProcessing.orchestrator.ts(184,33): error TS2315: Type 'Interpreter' is not generic.
+src/orchestrators/documentProcessing.orchestrator.ts(206,32): error TS2314: Generic type 'StateMachine<TContext, TEvent, TChildren, TActor, TAction, TGuard, TDelay, TStateValue, TTag, ... 4 more ..., TStateSchema>' requires 14 type argument(s).
+src/orchestrators/documentProcessing.orchestrator.ts(212,7): error TS2558: Expected 11-12 type arguments, but got 2.
+src/orchestrators/documentProcessing.orchestrator.ts(338,33): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+src/orchestrators/documentProcessing.orchestrator.ts(546,53): error TS2339: Property 'chunkCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+src/orchestrators/documentProcessing.orchestrator.ts(547,55): error TS2339: Property 'vectorCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+src/orchestrators/documentProcessing.orchestrator.ts(677,42): error TS2339: Property 'retryCount' does not exist on type 'AssignArgs<DocumentProcessingContext, DocumentProcessingEvent, DocumentProcessingEvent, ProvidedActor>'.
+src/orchestrators/documentProcessing.orchestrator.ts(917,9): error TS2322: Type 'boolean' is not assignable to type 'undefined'.
+src/orchestrators/documentProcessing.orchestrator.ts(939,17): error TS2339: Property 'onTransition' does not exist on type 'Actor<any>'.
+src/orchestrators/documentProcessing.orchestrator.ts(939,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/documentProcessing.orchestrator.ts(997,9): error TS2322: Type 'boolean' is not assignable to type 'undefined'.
+src/orchestrators/documentProcessing.orchestrator.ts(1012,17): error TS2339: Property 'onTransition' does not exist on type 'Actor<any>'.
+src/orchestrators/documentProcessing.orchestrator.ts(1012,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/documentProcessing.orchestrator.ts(1084,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/orchestrators/documentProcessing.orchestrator.ts(1155,31): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/queues/index.ts(2,25): error TS2305: Module '"bullmq"' has no exported member 'QueueScheduler'.
+src/queues/index.ts(70,7): error TS2353: Object literal may only specify known properties, and 'timeout' does not exist in type 'DefaultJobOptions'.
+src/queues/index.ts(92,3): error TS2322: Type 'Queue<T, any, string, ExtractDataType<DataTypeOrJob, DataTypeOrJob>, ExtractResultType<DataTypeOrJob, DefaultResultType>, ExtractNameType<...>>' is not assignable to type 'Queue<T, any, string, ExtractDataType<T, T>, ExtractResultType<T, any>, ExtractNameType<T, string>>'.
+  Types of property 'add' are incompatible.
+    Type '(name: ExtractNameType<DataTypeOrJob, DefaultNameType>, data: ExtractDataType<DataTypeOrJob, DataTypeOrJob>, opts?: JobsOptions | undefined) => Promise<...>' is not assignable to type '(name: ExtractNameType<T, string>, data: ExtractDataType<T, T>, opts?: JobsOptions | undefined) => Promise<Job<ExtractDataType<T, T>, ExtractResultType<...>, ExtractNameType<...>>>'.
+      Types of parameters 'name' and 'name' are incompatible.
+        Type 'ExtractNameType<T, string>' is not assignable to type 'ExtractNameType<DataTypeOrJob, DefaultNameType>'.
+          Type 'T' is not assignable to type 'DataTypeOrJob'.
+            'DataTypeOrJob' could be instantiated with an arbitrary type which could be unrelated to 'T'.
+src/queues/index.ts(164,26): error TS7006: Parameter 'error' implicitly has an 'any' type.
+src/queues/index.ts(211,7): error TS2322: Type 'string | undefined' is not assignable to type 'string | number | boolean'.
+  Type 'undefined' is not assignable to type 'string | number | boolean'.
+src/queues/index.ts(410,80): error TS2304: Cannot find name 'randomUUID'.
+src/queues/index.ts(423,33): error TS2345: Argument of type 'string' is not assignable to parameter of type 'ExtractNameType<T, string>'.
+src/queues/index.ts(440,5): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/queues/workers/analytics.worker.ts(88,29): error TS2551: Property 'countByTenantIdAndDateRange' does not exist on type 'DocumentRepository'. Did you mean 'countByStatusAndDateRange'?
+src/queues/workers/analytics.worker.ts(146,5): error TS2322: Type 'string | undefined' is not assignable to type 'string | number | boolean'.
+  Type 'undefined' is not assignable to type 'string | number | boolean'.
+src/queues/workers/analytics.worker.ts(267,7): error TS2554: Expected 2-3 arguments, but got 4.
+src/queues/workers/analytics.worker.ts(379,3): error TS2345: Argument of type '(job: Job<AnalyticsJobData, any, string>) => Promise<AnalyticsJobResult>' is not assignable to parameter of type '(job: any) => Promise<AnalyticsJobData>'.
+  Type 'Promise<AnalyticsJobResult>' is not assignable to type 'Promise<AnalyticsJobData>'.
+    Property 'payload' is missing in type 'AnalyticsJobResult' but required in type 'AnalyticsJobData'.
+src/queues/workers/document.worker.ts(138,5): error TS2322: Type 'string | undefined' is not assignable to type 'string | number | boolean'.
+  Type 'undefined' is not assignable to type 'string | number | boolean'.
+src/queues/workers/document.worker.ts(167,25): error TS2339: Property 'chunkCount' does not exist on type '{ tenant: { name: string; id: string; }; knowledgeBase: { name: string; id: string; }; } & { errorMessage: string | null; id: string; status: DocumentStatus; createdAt: Date; ... 9 more ...; metadata: JsonValue; }'.
+src/queues/workers/document.worker.ts(168,26): error TS2339: Property 'vectorCount' does not exist on type '{ tenant: { name: string; id: string; }; knowledgeBase: { name: string; id: string; }; } & { errorMessage: string | null; id: string; status: DocumentStatus; createdAt: Date; ... 9 more ...; metadata: JsonValue; }'.
+src/queues/workers/document.worker.ts(210,7): error TS2554: Expected 2-3 arguments, but got 4.
+src/queues/workers/document.worker.ts(220,19): error TS18046: 'result' is of type 'unknown'.
+src/queues/workers/document.worker.ts(221,20): error TS18046: 'result' is of type 'unknown'.
+src/queues/workers/document.worker.ts(228,31): error TS18046: 'result' is of type 'unknown'.
+src/queues/workers/document.worker.ts(229,32): error TS18046: 'result' is of type 'unknown'.
+src/queues/workers/document.worker.ts(236,19): error TS18046: 'result' is of type 'unknown'.
+src/queues/workers/document.worker.ts(237,20): error TS18046: 'result' is of type 'unknown'.
+src/queues/workers/document.worker.ts(335,3): error TS2345: Argument of type '(job: Job<DocumentJobData, any, string>) => Promise<DocumentJobResult>' is not assignable to parameter of type '(job: any) => Promise<DocumentJobData>'.
+  Type 'Promise<DocumentJobResult>' is not assignable to type 'Promise<DocumentJobData>'.
+    Type 'DocumentJobResult' is missing the following properties from type 'DocumentJobData': tenantId, knowledgeBaseId, text, uploadedBy
+src/routes/conversation.routes.ts(506,28): error TS2551: Property 'countByConversationId' does not exist on type 'MessageRepository'. Did you mean 'findByConversationId'?
+src/routes/document.routes.ts(40,56): error TS2345: Argument of type 'string' is not assignable to parameter of type '"application/pdf" | "text/plain" | "application/msword" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "application/vnd.ms-excel" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "application/vnd.ms-powerpoint" | "application/vnd.openxmlformats-officedocument.pre...'.
+src/routes/webhook.routes.ts(404,28): error TS2551: Property 'countByConversationId' does not exist on type 'MessageRepository'. Did you mean 'findByConversationId'?
+src/services/auth.service.ts(197,16): error TS2769: No overload matches this call.
+  Overload 1 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: null, options?: (SignOptions & { algorithm: "none"; }) | undefined): string', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'null'.
+  Overload 2 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: string | ArrayBuffer | SharedArrayBuffer | Uint8Array<ArrayBufferLike> | ... 17 more ... | RawPrivateKeyInput, options?: SignOptions | undefined): string', gave the following error.
+    Type 'string' is not assignable to type 'number | StringValue | undefined'.
+  Overload 3 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: string | ArrayBuffer | SharedArrayBuffer | Uint8Array<ArrayBufferLike> | ... 17 more ... | RawPrivateKeyInput, callback: SignCallback): void', gave the following error.
+    Object literal may only specify known properties, and 'expiresIn' does not exist in type 'SignCallback'.
+src/services/auth.service.ts(225,28): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/services/auth.service.ts(227,27): error TS2538: Type 'undefined' cannot be used as an index type.
+src/services/chat.service.ts(527,13): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(params: MessageCreateParamsNonStreaming, options?: RequestOptions | undefined): APIPromise<Message>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsNonStreaming'. Did you mean to write 'max_tokens'?
+  Overload 2 of 3, '(params: MessageCreateParamsStreaming, options?: RequestOptions | undefined): APIPromise<Stream<RawMessageStreamEvent>>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsStreaming'. Did you mean to write 'max_tokens'?
+  Overload 3 of 3, '(params: MessageCreateParamsBase, options?: RequestOptions | undefined): APIPromise<Message | Stream<RawMessageStreamEvent>>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsBase'. Did you mean to write 'max_tokens'?
+src/services/chat.service.ts(538,15): error TS18048: 'content' is possibly 'undefined'.
+src/services/chat.service.ts(614,36): error TS2339: Property 'fallback' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(221,13): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(params: MessageCreateParamsNonStreaming, options?: RequestOptions | undefined): APIPromise<Message>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsNonStreaming'. Did you mean to write 'max_tokens'?
+  Overload 2 of 3, '(params: MessageCreateParamsStreaming, options?: RequestOptions | undefined): APIPromise<Stream<RawMessageStreamEvent>>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsStreaming'. Did you mean to write 'max_tokens'?
+  Overload 3 of 3, '(params: MessageCreateParamsBase, options?: RequestOptions | undefined): APIPromise<Message | Stream<RawMessageStreamEvent>>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsBase'. Did you mean to write 'max_tokens'?
+src/services/embedding.service.ts(233,15): error TS18048: 'content' is possibly 'undefined'.
+src/services/embedding.service.ts(379,31): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(385,75): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(398,13): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(params: MessageCreateParamsNonStreaming, options?: RequestOptions | undefined): APIPromise<Message>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsNonStreaming'. Did you mean to write 'max_tokens'?
+  Overload 2 of 3, '(params: MessageCreateParamsStreaming, options?: RequestOptions | undefined): APIPromise<Stream<RawMessageStreamEvent>>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsStreaming'. Did you mean to write 'max_tokens'?
+  Overload 3 of 3, '(params: MessageCreateParamsBase, options?: RequestOptions | undefined): APIPromise<Message | Stream<RawMessageStreamEvent>>', gave the following error.
+    Object literal may only specify known properties, but 'maxTokens' does not exist in type 'MessageCreateParamsBase'. Did you mean to write 'max_tokens'?
+src/services/embedding.service.ts(409,15): error TS18048: 'content' is possibly 'undefined'.
+src/services/embedding.service.ts(454,39): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(455,93): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(490,31): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(808,22): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/services/embedding.service.ts(809,26): error TS2339: Property 'vector' does not exist on type '{ readonly env: { readonly nodeEnv: "development" | "test" | "production"; readonly isProduction: boolean; readonly isDevelopment: boolean; readonly isTest: boolean; }; readonly server: { readonly port: number; readonly host: "0.0.0.0"; readonly corsOrigin: string; readonly requestTimeoutMs: 60000; }; ... 18 more .....'.
+src/utils/date.ts(725,16): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/utils/date.ts(726,16): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/utils/date.ts(727,16): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/utils/date.ts(735,16): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/utils/date.ts(736,16): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/utils/date.ts(737,16): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/utils/idempotency.ts(207,62): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '"NX"' is not assignable to parameter of type '"KEEPTTL"'.

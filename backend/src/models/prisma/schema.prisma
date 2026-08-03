@@ -1,0 +1,371 @@
+// backend/src/models/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  // تمكين دعم النوع الصارم
+  previewFeatures = ["strictUndefinedChecks"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // تمكين ملحق pgvector للبحث عن المتجهات
+  extensions = [vector]
+}
+
+// ============================================================
+// الأنواع المخصصة (Custom Types)
+// ============================================================
+
+// دور المستخدم في النظام (RBAC)
+enum UserRole {
+  ADMIN
+  AGENT
+  VIEWER
+}
+
+// خطة المستأجر (التسعير)
+enum TenantPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// حالة المستأجر
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// حالة المستخدم
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+// حالة المستند
+enum DocumentStatus {
+  PENDING    // في انتظار المعالجة
+  PROCESSING // جارٍ المعالجة
+  COMPLETED  // اكتملت المعالجة
+  FAILED     // فشلت المعالجة
+  DELETED    // محذوف
+}
+
+// حالة المحادثة
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+// دور المرسل في الرسالة
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ============================================================
+// النماذج (Models)
+// ============================================================
+
+/// جدول المستأجرين (الشركات/المؤسسات) — SSoT للبيانات متعددة المستأجرين
+model Tenant {
+  id           String         @id @default(uuid()) @db.Uuid
+  name         String         @unique @db.VarChar(100)
+  domain       String         @unique @db.VarChar(100)
+  adminEmail   String         @db.VarChar(255)
+  adminName    String         @db.VarChar(100)
+  plan         TenantPlan     @default(FREE)
+  settings     Json           @default("{}") // إعدادات مخصصة (JSON)
+  status       TenantStatus   @default(ACTIVE)
+
+  // تكامل WhatsApp
+  whatsappPhoneNumberId String?  @db.VarChar(50)
+
+  // حقول التدقيق
+  createdBy    String         @db.Uuid
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?      // الحذف الناعم (Soft Delete)
+
+  // العلاقات
+  users         User[]
+  knowledgeBases KnowledgeBase[]
+  documents     Document[]
+  conversations Conversation[]
+  auditLogs     AuditLog[]
+
+  @@index([status])
+  @@index([domain])
+  @@index([deletedAt])
+}
+
+/// جدول المستخدمين (التسجيل والمصادقة)
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @db.VarChar(255)
+  passwordHash  String         @db.Text          // مشفرة بـ bcrypt
+  fullName      String         @db.VarChar(100)
+  phoneNumber   String?        @db.VarChar(20)
+  role          UserRole       @default(VIEWER)
+  status        UserStatus     @default(ACTIVE)
+
+  // المفاتيح الخارجية
+  tenantId      String         @db.Uuid
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // حقول التدقيق
+  lastLoginAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?      // الحذف الناعم
+
+  // العلاقات
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]     @relation("UserAudit")
+  createdKnowledgeBases KnowledgeBase[] @relation("CreatedBy")
+  createdDocuments Document[] @relation("UploadedBy")
+  sentMessages  Message[]      @relation("SentBy")
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@index([email])
+  @@index([deletedAt])
+}
+
+/// جدول توكنات التحديث (Refresh Tokens) — للمصادقة
+model RefreshToken {
+  id           String   @id @default(uuid()) @db.Uuid
+  token        String   @unique @db.Text     // UUID v4
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revokedAt    DateTime?
+
+  @@index([token])
+  @@index([userId, expiresAt])
+  @@index([revokedAt])
+}
+
+/// جدول قواعد المعرفة (Knowledge Bases)
+model KnowledgeBase {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(100)
+  description   String?  @db.Text
+  isActive      Boolean  @default(true)
+  tags          String[] @default([]) // مصفوفة من النصوص
+
+  // المفاتيح الخارجية
+  tenantId      String   @db.Uuid
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // حقول التدقيق
+  createdBy     String   @db.Uuid
+  createdByUser User     @relation("CreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime? // الحذف الناعم
+
+  // العلاقات
+  documents     Document[]
+  conversations Conversation[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, createdAt])
+  @@index([deletedAt])
+}
+
+/// جدول المستندات (الملفات المرفوعة)
+model Document {
+  id              String         @id @default(uuid()) @db.Uuid
+  fileName        String         @db.VarChar(255)
+  fileSize        Int            // بالبايت
+  mimeType        String         @db.VarChar(100)
+  storagePath     String         @db.Text          // مسار التخزين (S3 أو محلي)
+  description     String?        @db.Text
+  tags            String[]       @default([])
+  status          DocumentStatus @default(PENDING)
+  errorMessage    String?        @db.Text          // رسالة الخطأ (عند الفشل)
+
+  // المفاتيح الخارجية
+  knowledgeBaseId String         @db.Uuid
+  knowledgeBase   KnowledgeBase  @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  tenantId        String         @db.Uuid
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // حقول التدقيق
+  uploadedBy      String         @db.Uuid
+  uploader        User           @relation("UploadedBy", fields: [uploadedBy], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?      // الحذف الناعم
+  processedAt     DateTime?      // وقت اكتمال المعالجة
+  chunkCount      Int?           // عدد المقاطع
+  vectorCount     Int?           // عدد المتجهات
+
+  // العلاقات
+  chunks          DocumentChunk[]
+
+  @@unique([tenantId, knowledgeBaseId, fileName])
+  @@index([tenantId, knowledgeBaseId, status])
+  @@index([tenantId, status])
+  @@index([knowledgeBaseId, status])
+  @@index([tenantId, createdAt])
+  @@index([deletedAt])
+}
+
+/// جدول مقاطع المستندات (مع المتجهات) — pgvector
+model DocumentChunk {
+  id              String   @id @default(uuid()) @db.Uuid
+  content         String   @db.Text          // نص المقطع
+  vector          Unsupported("vector(1024)")? // متجه التضمين (pgvector)
+  chunkIndex      Int      // ترتيب المقطع في المستند
+  metadata        Json?    @default("{}")    // بيانات وصفية إضافية
+
+  // المفاتيح الخارجية
+  documentId      String   @db.Uuid
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  knowledgeBaseId String   @db.Uuid
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  tenantId        String   @db.Uuid
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // حقول التدقيق
+  createdAt       DateTime @default(now())
+
+  // فهارس pgvector للبحث السريع
+  @@index([documentId, chunkIndex])
+  @@index([tenantId, knowledgeBaseId])
+  @@index([knowledgeBaseId])
+  // فهرس IVFFlat أو HNSW (يُنشأ يدوياً في الترحيلات)
+  // @@index([vector], type: Ivfflat(ops: vector_cosine_ops, lists: 100))
+  // @@index([vector], type: Hnsw(ops: vector_cosine_ops))
+}
+
+/// جدول المحادثات (Conversations)
+model Conversation {
+  id              String              @id @default(uuid()) @db.Uuid
+  phoneNumberId   String              @db.VarChar(50) // رقم هاتف العميل (من WhatsApp)
+  customerName    String?             @db.VarChar(100)
+  status          ConversationStatus  @default(ACTIVE)
+
+  // المفاتيح الخارجية
+  tenantId        String              @db.Uuid
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  knowledgeBaseId String?             @db.Uuid
+  knowledgeBase   KnowledgeBase?      @relation(fields: [knowledgeBaseId], references: [id])
+
+  // حقول التدقيق
+  createdBy       String              @db.Uuid
+  creator         User                @relation(fields: [createdBy], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  closedAt        DateTime?           // وقت الإغلاق
+  deletedAt       DateTime?           // الحذف الناعم
+  messageCount    Int                 @default(0) // عدد الرسائل (مشتق)
+
+  // العلاقات
+  messages        Message[]
+
+  @@unique([tenantId, phoneNumberId])
+  @@index([tenantId, status])
+  @@index([tenantId, phoneNumberId])
+  @@index([tenantId, createdAt])
+  @@index([status, createdAt])
+  @@index([deletedAt])
+}
+
+/// جدول الرسائل (Messages)
+model Message {
+  id              String      @id @default(uuid()) @db.Uuid
+  content         String      @db.Text
+  role            MessageRole @default(USER)
+  metadata        Json?       @default("{}") // { citations, suggestedQuestions, contextChunks, error, tokensUsed, etc. }
+
+  // المفاتيح الخارجية
+  conversationId  String      @db.Uuid
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tenantId        String      @db.Uuid
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // حقول التدقيق
+  sentBy          String      @db.Uuid   // معرف المستخدم أو "system" أو "whatsapp:..."
+  sender          User        @relation("SentBy", fields: [sentBy], references: [id])
+  createdAt       DateTime    @default(now())
+  deletedAt       DateTime?   // الحذف الناعم
+
+  // معرف خارجي (مثل معرف رسالة WhatsApp)
+  externalId      String?     @db.VarChar(255)
+
+  @@index([conversationId, createdAt])
+  @@index([tenantId, conversationId])
+  @@index([externalId])
+  @@index([sentBy, createdAt])
+  @@index([deletedAt])
+}
+
+/// جدول قوالب المطالبات (Prompts) — مُصدرة ومُرقمة — §6
+model PromptTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  version     String   @db.VarChar(20)    // مثل "1.0.0"
+  identifier  String   @unique @db.VarChar(50) // مثل "embed-v1", "chat-v1"
+  content     String   @db.Text           // نص المطالبة
+  description String?  @db.Text           // وصف المطالبة
+  isActive    Boolean  @default(true)
+
+  // حقول التدقيق
+  createdBy   String   @db.Uuid
+  creator     User     @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // بيانات إضافية
+  model       String?  @db.VarChar(50)    // النموذج المستهدف (مثل claude-3-sonnet)
+  maxTokens   Int?     // الحد الأقصى للرموز
+
+  @@index([identifier, version])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+/// جدول سجل التدقيق (Audit Log) — §7
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  eventType     String   @db.VarChar(100)   // مثل "auth.login", "document.upload", "kb.create"
+  resourceType  String?  @db.VarChar(50)    // "User", "Document", "KnowledgeBase", إلخ
+  resourceId    String?  @db.Uuid           // معرف المورد المتأثر
+  tenantId      String?  @db.Uuid           // معرف المستأجر (إذا كان متاحاً)
+  userId        String?  @db.Uuid           // معرف المستخدم (الفاعل)
+  user          User?    @relation("UserAudit", fields: [userId], references: [id])
+  ipAddress     String?  @db.VarChar(45)
+  userAgent     String?  @db.Text
+  payload       Json?    @default("{}")    // البيانات الإضافية
+  timestamp     DateTime @default(now())
+  correlationId String?  @db.Uuid           // معرّف الارتباط (من middleware)
+
+  @@index([tenantId, timestamp])
+  @@index([userId, timestamp])
+  @@index([eventType, timestamp])
+  @@index([resourceType, resourceId])
+  @@index([correlationId])
+  @@index([timestamp])
+}
+
+/// جدول المقاييس (Metrics) — لتخزين مقاييس RED ومقاييس الذكاء الاصطناعي
+model Metric {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(100)   // مثل "ai.requests", "ai.tokens", "http.requests"
+  value         Float    // القيمة (عدد، مدة، إلخ)
+  tags          Json?    @default("{}")    // بيانات إضافية (مثل { service: "chat", status: "success" })
+  tenantId      String?  @db.Uuid
+  timestamp     DateTime @default(now())
+
+  @@index([name, timestamp])
+  @@index([tenantId, name, timestamp])
+}

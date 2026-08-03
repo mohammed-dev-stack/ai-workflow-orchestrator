@@ -1,0 +1,314 @@
+// ============================================================
+// backend/prisma/schema.prisma
+// ============================================================
+// مخطط قاعدة البيانات (Prisma Schema)
+// تم إصلاح تعارض أسماء القيود والعلاقات المفقودة.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // تم حذف url - يُقرأ من prisma.config.ts
+}
+
+// ============================================================
+// نموذج: المستأجر (Tenant)
+// ============================================================
+model Tenant {
+  id                    String       @id @default(uuid())
+  name                  String // تم إزالة @unique لمنع التعارض مع @@unique
+  domain                String?      @unique
+  adminEmail            String
+  phoneNumber           String?
+  whatsappPhoneNumberId String?      @unique
+  status                TenantStatus @default(ACTIVE)
+  plan                  TenantPlan   @default(FREE)
+  planExpiresAt         DateTime?
+  storageUsed           BigInt       @default(0)
+  aiRequestsLimit       Int          @default(1000)
+  aiRequestsUsed        Int          @default(0)
+  settings              Json         @default("{}")
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  deletedAt             DateTime?
+
+  users          User[]
+  knowledgeBases KnowledgeBase[]
+  documents      Document[]
+  conversations  Conversation[]
+  messages       Message[]
+
+  // ✅ تم الاحتفاظ بـ @@unique على name فقط
+  @@unique([name])
+  @@index([status])
+  @@index([plan])
+  @@index([deletedAt])
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  DELETED
+}
+
+enum TenantPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// ============================================================
+// نموذج: المستخدم (User)
+// ============================================================
+model User {
+  id           String    @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  name         String
+  role         UserRole  @default(VIEWER)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@unique([tenantId, email])
+  @@index([email])
+  @@index([role])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+// ============================================================
+// نموذج: توكن التحديث (RefreshToken)
+// ============================================================
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+// نموذج: قاعدة المعرفة (KnowledgeBase)
+// ============================================================
+model KnowledgeBase {
+  id          String    @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("knowledge_bases")
+}
+
+// ============================================================
+// نموذج: المستند (Document)
+// ============================================================
+model Document {
+  id              String         @id @default(uuid())
+  tenantId        String
+  knowledgeBaseId String
+  fileName        String
+  fileType        String
+  fileSize        Int
+  fileUrl         String?
+  description     String?
+  status          DocumentStatus @default(PENDING)
+  errorMessage    String?
+  metadata        Json           @default("{}")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  knowledgeBase KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  chunks        DocumentChunk[]
+
+  @@unique([tenantId, knowledgeBaseId, fileName])
+  @@index([tenantId])
+  @@index([knowledgeBaseId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DELETED
+}
+
+// ============================================================
+// نموذج: جزء المستند (DocumentChunk)
+// ============================================================
+model DocumentChunk {
+  id              String                       @id @default(uuid())
+  documentId      String
+  knowledgeBaseId String
+  content         String                       @db.Text
+  vector          Unsupported("vector(1024)")?
+  chunkIndex      Int
+  metadata        Json                         @default("{}")
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  deletedAt       DateTime?
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([knowledgeBaseId])
+  @@index([chunkIndex])
+  @@index([deletedAt])
+  @@map("document_chunks")
+}
+
+// ============================================================
+// نموذج: المحادثة (Conversation)
+// ============================================================
+model Conversation {
+  id            String             @id @default(uuid())
+  tenantId      String
+  userId        String?
+  phoneNumberId String?
+  externalId    String?
+  title         String?
+  status        ConversationStatus @default(ACTIVE)
+  lastMessageAt DateTime?          @default(now())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([tenantId, phoneNumberId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([phoneNumberId])
+  @@index([externalId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([deletedAt])
+  @@map("conversations")
+}
+
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+  DELETED
+}
+
+// ============================================================
+// نموذج: الرسالة (Message)
+// ============================================================
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  tenantId       String
+  externalId     String?
+  role           MessageRole
+  content        String      @db.Text
+  metadata       Json        @default("{}")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+
+  // ✅ تم إضافة العلاقة العكسية مع Tenant
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([tenantId])
+  @@index([externalId])
+  @@index([role])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ============================================================
+// نموذج: قالب المطالبة (PromptTemplate)
+// ============================================================
+model PromptTemplate {
+  id          String   @id @default(uuid())
+  identifier  String
+  version     String
+  content     String   @db.Text
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([identifier, version])
+  @@index([identifier])
+  @@index([isActive])
+  @@map("prompt_templates")
+}
+
+// ============================================================
+// نموذج: سجل الأحداث (AuditLog) - اختياري
+// ============================================================
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  details    Json     @default("{}")
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

@@ -7,7 +7,7 @@ import logger from '../utils/logger';
 import type { HealthCheckResult } from './types';
  
 let redisClient: Redis | null = null;
- 
+
 function buildRedisOptions(source = env): RedisOptions {
   return {
     host: source.REDIS_HOST,
@@ -16,8 +16,8 @@ function buildRedisOptions(source = env): RedisOptions {
     tls: source.REDIS_TLS ? {} : undefined,
     connectTimeout: source.REDIS_CONNECT_TIMEOUT_MS,
     maxRetriesPerRequest: source.REDIS_MAX_RETRIES_PER_REQUEST,
-    retryStrategy: (times: number) => Math.min(times * 50, 2000),
-    lazyConnect: true,
+    retryStrategy:(times:number)=>Math.min(times*50,1200),
+    lazyConnect : true ,
   };
 }
  
@@ -59,7 +59,8 @@ export async function disconnectRedis(): Promise<void> {
   redisClient = null;
 }
  
-export async function redisHealthCheck(): Promise<HealthCheckResult> {
+export async function redisHealthCheck()
+: Promise<HealthCheckResult> {
   if (!redisClient || redisClient.status !== 'ready') {
     return { status: 'disconnected' };
   }

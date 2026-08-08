@@ -1,5 +1,14 @@
+// ============================================================
 // backend/src/repositories/document.repository.ts
+// ============================================================
+// مستودع المستندات (Document Repository)
+// يدير عمليات CRUD والتحليلات على جدول المستندات.
+// تم تعديله لاستخدام tableNameMapper للحصول على اسم الجدول الفعلي
+// بدلاً من كتابته بشكل ثابت، لضمان التوافق مع @@map في Prisma.
+// ============================================================
+
 import { PrismaClient, Document, Prisma } from '../generated/prisma/index.js';
+import { getTableName } from '../utils/tableNameMapper.js'; // ✅ استيراد الحل المركزي
 
 export interface FindDocumentsOptions {
   limit?: number;
@@ -23,12 +32,18 @@ export class DocumentRepository {
     this.prisma = prismaClient;
   }
 
+  /**
+   * جلب مستند بواسطة المعرف (مع التحقق من soft delete).
+   */
   async findById(id: string): Promise<Document | null> {
     return this.prisma.document.findUnique({
       where: { id, deletedAt: null },
     });
   }
 
+  /**
+   * جلب قائمة المستندات الخاصة بقاعدة معرفة محددة مع دعم الترحيل والتصفية.
+   */
   async findByKnowledgeBaseId(
     knowledgeBaseId: string,
     options: FindDocumentsOptions = {}
@@ -53,6 +68,9 @@ export class DocumentRepository {
     return { items, total, limit, offset };
   }
 
+  /**
+   * جلب قائمة المستندات الخاصة بمستأجر معين مع دعم البحث والتصفية.
+   */
   async findByTenantId(
     tenantId: string,
     options: FindDocumentsOptions = {}
@@ -83,6 +101,9 @@ export class DocumentRepository {
     return { items, total, limit, offset };
   }
 
+  /**
+   * جلب مستند بواسطة اسم الملف (للتأكد من عدم التكرار).
+   */
   async findByFileName(
     tenantId: string,
     knowledgeBaseId: string,
@@ -98,10 +119,16 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * إنشاء مستند جديد.
+   */
   async create(data: Prisma.DocumentCreateInput): Promise<Document> {
     return this.prisma.document.create({ data });
   }
 
+  /**
+   * تحديث مستند موجود.
+   */
   async update(id: string, data: Prisma.DocumentUpdateInput): Promise<Document> {
     return this.prisma.document.update({
       where: { id, deletedAt: null },
@@ -109,6 +136,9 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * حذف مستند (حذف ناعم – soft delete).
+   */
   async softDelete(id: string): Promise<Document> {
     return this.prisma.document.update({
       where: { id },
@@ -116,6 +146,9 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * استعادة مستند محذوف ناعماً.
+   */
   async restore(id: string): Promise<Document> {
     return this.prisma.document.update({
       where: { id },
@@ -123,6 +156,9 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * تحديث حالة المستند (مثل PENDING → PROCESSING → COMPLETED).
+   */
   async updateStatus(
     id: string,
     status: string,
@@ -138,13 +174,22 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * حساب عدد المستندات في قاعدة معرفة محددة.
+   */
   async countByKnowledgeBaseId(knowledgeBaseId: string): Promise<number> {
     return this.prisma.document.count({
       where: { knowledgeBaseId, deletedAt: null },
     });
   }
 
-  // ✅ الدوال المطلوبة للتحليلات (مثل message.repository.ts)
+  // ============================================================
+  // دوال التحليلات (Analytics) — تم إصلاحها باستخدام tableNameMapper
+  // ============================================================
+
+  /**
+   * حساب عدد المستندات لمستأجر في نطاق زمني محدد.
+   */
   async countByTenantIdAndDateRange(
     tenantId: string,
     startDate: Date,
@@ -160,6 +205,11 @@ export class DocumentRepository {
     return this.prisma.document.count({ where });
   }
 
+  /**
+   * ✅ تم إصلاح هذه الدالة: كانت تستخدم "documents" بشكل ثابت.
+   * الآن تستخرج اسم الجدول الفعلي (الذي قد يكون مختلفاً لو تغير الـ @@map مستقبلاً)
+   * باستخدام getTableName('Document').
+   */
   async countByDateRangeGrouped(
     tenantId: string,
     startDate: Date,
@@ -181,11 +231,14 @@ export class DocumentRepository {
         dateFormat = 'YYYY-MM-DD';
     }
 
+    // ✅ استخراج اسم الجدول الفعلي من الخريطة المركزية
+    const tableName = getTableName('Document');
+
     const result = await this.prisma.$queryRaw<{ date: string; count: bigint }[]>`
       SELECT
         TO_CHAR("createdAt", ${dateFormat}) as date,
         COUNT(*) as count
-      FROM "documents"
+      FROM "${Prisma.raw(tableName)}"
       WHERE "tenantId" = ${tenantId}::text
         AND "createdAt" BETWEEN ${startDate} AND ${endDate}
         AND "deletedAt" IS NULL
@@ -197,4 +250,3 @@ export class DocumentRepository {
     return result.map((r) => ({ date: r.date, count: Number(r.count) }));
   }
 }
-

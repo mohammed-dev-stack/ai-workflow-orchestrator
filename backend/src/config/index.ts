@@ -171,11 +171,6 @@ export const config = {
   logging: appConfig.logging,
 } as const;
 
-/**
- * استنتاج نوع الإعدادات الكامل من كائن config.
- * هذا يضمن سلامة النوع 100% ولا وجود لـ `any`.
- * [مُتحقَّق منطقياً بتتبع كامل] — استدلال TypeScript موثوق به.
- */
 export type AppConfig = typeof config;
 
 /**

@@ -1,5 +1,15 @@
+// ============================================================
 // backend/src/repositories/message.repository.ts
+// ============================================================
+// مستودع الرسائل (Message Repository)
+// يدير عمليات CRUD والتحليلات على جدول الرسائل.
+// ✅ تم إصلاح العطل الحقيقي هنا: كان يستخدم "Message" (بحرف M كبير)
+// بينما الـ @@map في schema.prisma هو "messages" (بحرف m صغير).
+// الآن يستخدم tableNameMapper للحصول على الاسم الصحيح ديناميكياً.
+// ============================================================
+
 import { PrismaClient, Message, Prisma } from '../generated/prisma/index.js';
+import { getTableName } from '../utils/tableNameMapper.js'; // ✅ استيراد الحل المركز
 
 export interface FindMessagesOptions {
   /** عدد العناصر في الصفحة (افتراضي: 50) */
@@ -155,6 +165,10 @@ export class MessageRepository {
     });
   }
 
+  // ============================================================
+  // دوال التحليلات (Analytics) — تم إصلاحها بالكامل
+  // ============================================================
+
   /**
    * حساب عدد الرسائل لمستأجر في نطاق زمني (للتحليلات).
    */
@@ -176,7 +190,10 @@ export class MessageRepository {
   }
 
   /**
-   * حساب عدد الرسائل لمستأجر في نطاق زمني، مجمعة حسب اليوم/الأسبوع/الشهر (للتحليلات).
+   * ✅ تم إصلاح هذه الدالة بالكامل.
+   * كانت تستخدم FROM "Message" (بحرف M كبير) مما يسبب خطأ
+   * relation "Message" does not exist.
+   * الآن تستخدم getTableName('Message') الذي يعيد 'messages' (بحرف m صغير).
    */
   async countByDateRangeGrouped(
     tenantId: string,
@@ -199,11 +216,14 @@ export class MessageRepository {
         dateFormat = 'YYYY-MM-DD';
     }
 
+    // ✅ استخراج اسم الجدول الفعلي ('messages' وليس 'Message')
+    const tableName = getTableName('Message');
+
     const result = await this.prisma.$queryRaw<{ date: string; count: bigint }[]>`
       SELECT
         TO_CHAR("createdAt", ${dateFormat}) as date,
         COUNT(*) as count
-      FROM "Message"
+      FROM "${Prisma.raw(tableName)}"
       WHERE "tenantId" = ${tenantId}::text
         AND "createdAt" BETWEEN ${startDate} AND ${endDate}
         AND "deletedAt" IS NULL
@@ -215,18 +235,22 @@ export class MessageRepository {
   }
 
   /**
-   * حساب عدد الرسائل لمستأجر في نطاق زمني، مجمعة حسب دور المرسل (للتحليلات).
+   * ✅ تم إصلاح هذه الدالة أيضاً (نفس المشكلة).
+   * كانت تستخدم FROM "Message" بشكل ثابت.
    */
   async countByRoleAndDateRange(
     tenantId: string,
     startDate: Date,
     endDate: Date
   ): Promise<{ role: string; count: number }[]> {
+    // ✅ استخراج اسم الجدول الفعلي ('messages')
+    const tableName = getTableName('Message');
+
     const result = await this.prisma.$queryRaw<{ role: string; count: bigint }[]>`
       SELECT
         role,
         COUNT(*) as count
-      FROM "Message"
+      FROM "${Prisma.raw(tableName)}"
       WHERE "tenantId" = ${tenantId}::text
         AND "createdAt" BETWEEN ${startDate} AND ${endDate}
         AND "deletedAt" IS NULL
@@ -235,4 +259,3 @@ export class MessageRepository {
     return result.map((r) => ({ role: r.role, count: Number(r.count) }));
   }
 }
-

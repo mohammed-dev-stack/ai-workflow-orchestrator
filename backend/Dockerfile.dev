@@ -1,0 +1,19 @@
+# مرحلة التطوير
+FROM node:20-alpine
+
+WORKDIR /app
+
+# نسخ ملفات الحزم لتثبيت الاعتماديات
+COPY package*.json ./
+
+# تثبيت جميع الاعتماديات (بما فيها devDependencies)
+RUN npm install
+
+# نسخ باقي الكود (يتم ربطه عبر volume لاحقاً)
+COPY . .
+
+# فتح المنفذ
+EXPOSE 5000
+
+# تشغيل وضع التطوير مع nodemon
+CMD ["npm", "run", "dev"]

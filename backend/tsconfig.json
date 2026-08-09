@@ -1,40 +1,113 @@
 {
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "dist",
-    "module": "ES2022",
+    // ============================================
+    //  ECMASCRIPT TARGET & MODULE
+    // ============================================
+    "target": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
-    "target": "es2022",
-    "types": [],
+    "lib": ["ES2022"],
+
+    // ============================================
+    //  OUTPUT & SOURCE MAPS
+    // ============================================
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": true,
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": false,
+
+    // ============================================
+    //  STRICT TYPE CHECKING
+    // ============================================
     "strict": true,
-    "jsx": "react-jsx",
-    "verbatimModuleSyntax": false,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUncheckedIndexedAccess": true,
+
+    // ============================================
+    //  MODULE RESOLUTION & INTEROP
+    // ============================================
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+
+    // ============================================
+    //  PATHS & ALIASES
+    // ============================================
     "paths": {
       "@/*": ["./src/*"],
+      "@config/*": ["./src/config/*"],
+      "@core/*": ["./src/core/*"],
+      "@models/*": ["./src/models/*"],
+      "@services/*": ["./src/services/*"],
+      "@api/*": ["./src/api/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@workers/*": ["./src/workers/*"],
+      "@queues/*": ["./src/queues/*"],
       "@prisma/client": ["./src/generated/prisma"]
-    }
+    },
+
+    // ============================================
+    //  TYPES & DECLARATIONS
+    // ============================================
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+
+    // ============================================
+    //  PERFORMANCE & OPTIMIZATION
+    // ============================================
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
+    "preserveWatchOutput": true,
+
+    // ============================================
+    //  EXPERIMENTAL FEATURES
+    // ============================================
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // ============================================
+    //  JSX SUPPORT
+    // ============================================
+    "jsx": "react-jsx"
   },
-  // ✅ تم إزالة "prisma.config.ts" من include
-  "include": ["src/**/*"],
-  // ✅ إضافة استبعاد صريح للملفات غير المرغوب فيها
+
+  // ============================================
+  //  FILE INCLUSION & EXCLUSION
+  // ============================================
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/types/**/*.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "logs",
     "prisma.config.ts",
     "prisma.config.js",
     "prisma.config.d.ts",
     "prisma.config.js.map"
-  ]
+  ],
+
+  // ============================================
+  //  WATCHER OPTIONS
+  // ============================================
+  "watchOptions": {
+    "watchFile": "priorityPollingInterval",
+    "watchDirectory": "dynamicPriorityPolling",
+    "excludeDirectories": ["**/node_modules", "**/dist", "**/logs"]
+  }
 }

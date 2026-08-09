@@ -1,243 +1,227 @@
 // ============================================================
 // backend/src/config/ai.config.ts
 // ============================================================
-// إعدادات الذكاء الاصطناعي (Anthropic Claude)
-// تُجمِّع كل الإعدادات المتعلقة بـ AI في مكان واحد، وتُوفِّر قيم افتراضية آمنة ومنطقية.
-// تطبق SSoT لإعدادات AI، وتدعم الاحتياطي (fallback) وإعادة المحاولة وقواطع الدائرة.
+// المصدر الوحيد (SSoT) لإعدادات الذكاء الاصطناعي (Anthropic Claude)
+// يدمج جميع الإعدادات من متغيرات البيئة مع قيم افتراضية آمنة ومنطقية.
+// ✅ تم إصلاح جميع الأخطاء النوعية:
+//    - إزالة الاعتماد على AI_MODE (غير موجود في EnvConfig)
+//    - تحديد الوضع (mock/real) تلقائياً بناءً على NODE_ENV ومفتاح API
+//    - تثبيت الأنواع الحرفية باستخدام 'as const'
+//    - إضافة getSafeAIConfig للاستخدام الآمن في التسجيل
 // ============================================================
 
-import { envConfig } from './env.schema';
+import { envConfig, EnvConfig } from './env.schema';
+
+// ============================================================
+// 1. الأنواع (Types)
+// ============================================================
 
 /**
- * كائن إعدادات الذكاء الاصطناعي.
- * يشمل إعدادات عميل Anthropic، المطالبات، إعادة المحاولة، التحقق من المخرجات، الاحتياطي، وقاطع الدائرة.
- * يتبع مبدأ الفشل السريع (Fail-Fast) في حال عدم وجود مفتاح API.
- *
- * [مُتحقَّق منطقياً بتتبع كامل] — جميع الخصائص مُعرَّفة، والأنواع مستنتجة بدقة.
+ * إعدادات الذكاء الاصطناعي – الهيكل الكامل.
+ * كل الخصائص للقراءة فقط (readonly) لضمان عدم تعديلها أثناء التشغيل.
  */
-export const aiConfig = {
-  /**
-   * إعدادات عميل Anthropic الأساسية.
-   */
-  anthropic: {
-    /**
-     * مفتاح API (يُقرأ من البيئة).
-     */
-    apiKey: envConfig.ANTHROPIC_API_KEY,
+export interface AIConfig {
+  /** إعدادات عميل Anthropic الأساسية */
+  readonly anthropic: {
+    /** مفتاح API (يُقرأ من البيئة) */
+    readonly apiKey: string;
+    /** النموذج الأساسي المستخدم */
+    readonly model: string;
+    /** النموذج الاحتياطي (في حال فشل النموذج الأساسي) */
+    readonly fallbackModel: string;
+    /** الحد الأقصى لعدد الرموز (tokens) في الرد */
+    readonly maxTokens: number;
+    /** درجة العشوائية (temperature) – تتحكم في إبداع الردود */
+    readonly temperature: number;
+    /** مهلة الطلب بالمللي ثانية */
+    readonly timeoutMs: number;
+    /** الحد الأقصى لطول النص المُرسَل إلى API (بالأحرف) */
+    readonly maxPromptLength: number;
+  };
 
-    /**
-     * النموذج الأساسي المستخدم (من البيئة أو القيمة الافتراضية).
-     */
-    model: envConfig.ANTHROPIC_MODEL,
+  /** وضع التشغيل: mock (محاكاة مجانية) أو real (API حقيقي) */
+  readonly mode: 'mock' | 'real';
 
-    /**
-     * النموذج الاحتياطي (fallback) في حال فشل النموذج الأساسي أو تجاوز حد المعدل.
-     */
-  fallbackModle: envConfig.ANTHROPIC_FALLBACK_MODEL,
-    /**
-     * الحد الأقصى لعدد الرموز (tokens) في الرد (من البيئة).
-     */
-    maxTokens: envConfig.ANTHROPIC_MAX_TOKENS,
+  /** إعدادات قاطع الدائرة المخصصة للذكاء الاصطناعي */
+  readonly circuitBreaker: {
+    readonly timeoutMs: number;
+    readonly errorThreshold: number;
+    readonly halfOpenWaitMs: number;
+  };
 
-    /**
-     * درجة العشوائية (temperature) — تتحكم في إبداع الردود.
-     */
-    temperature: envConfig.ANTHROPIC_TEMPERATURE,
+  /** إعدادات إعادة المحاولة (Retry) – تراجع أسي مع تشويش */
+  readonly retry: {
+    readonly maxAttempts: number;
+    readonly backoffBaseMs: number;
+    readonly maxBackoffMs: number;
+    readonly retryableStatusCodes: readonly number[];
+  };
 
-    /**
-     * مهلة الطلب بالمللي ثانية (مشتقة من قاطع الدائرة العام).
-     * قيمة افتراضية: 30 ثانية (من CIRCUIT_BREAKER_TIMEOUT).
-     */
-    timeoutMs: envConfig.CIRCUIT_BREAKER_TIMEOUT,
+  /** إعدادات المطالبات (Prompts) */
+  readonly prompts: {
+    readonly versions: {
+      readonly embedding: {
+        readonly id: string;
+        readonly version: string;
+        readonly maxInputLength: number;
+      };
+      readonly chat: {
+        readonly id: string;
+        readonly version: string;
+        readonly maxInputLength: number;
+        readonly maxContextChunks: number;
+      };
+    };
+    readonly storagePath: string;
+  };
 
-    /**
-     * الحد الأقصى لطول النص المُرسَل إلى API (بالأحرف) — لحماية من هجمات الحجم.
-     * قيمة افتراضية: 100,000 حرف (حوالي 25,000 رمز).
-     */
-    maxPromptLength: 100000,
-  },
+  /** إعدادات التحقق من المخرجات (Output Validation) */
+  readonly validation: {
+    readonly enforceStrictValidation: boolean;
+    readonly onValidationFailure: 'retry' | 'fallback' | 'throw';
+    readonly maxRetriesOnValidationFailure: number;
+  };
 
-  /**
-   * إعدادات المطالبات (Prompts) — §6 (إصدار المطالبات خارجياً).
-   * تُعرَّف المطالبات هنا بمعرفاتها وإصداراتها.
-   * المحتوى الفعلي للمطالبات يُخزَّن في ملفات منفصلة في مجلد `../ai/prompts/`.
-   */
-  prompts: {
-    /**
-     * قائمة المطالبات المُصدرة مع إصداراتها.
-     * كل مطالبة لها معرف فريد (مثل 'embed-v1') يُستخدم للإشارة إليها في الكود.
-     * هذا يضمن إمكانية تتبع التغييرات والرجوع إلى إصدارات سابقة.
-     */
-    versions: {
-      /**
-       * مطالبة التضمين (Embedding) — تُستخدم لاستخراج التضمينات من النصوص.
-       * الإصدار: v1
-       */
-      embedding: {
-        id: 'embed-v1',
-        version: '1.0.0',
-        /**
-         * الحد الأقصى لطول النص المُرسَل للمطالبة (بالأحرف).
-         * إذا تجاوز النص هذا الحد، يتم اقتطاعه قبل الإرسال.
-         */
-        maxInputLength: 50000,
-      },
+  /** استراتيجية الاحتياطي (Fallback) عند فشل جميع محاولات AI */
+  readonly fallback: {
+    readonly strategy: 'static' | 'error' | 'queue';
+    readonly staticResponse: {
+      readonly ar: string;
+      readonly en: string;
+    };
+  };
 
-      /**
-       * مطالبة الرد على المحادثة (Chat) — تُستخدم لتوليد ردود على استفسارات العملاء.
-       * الإصدار: v1
-       */
-      chat: {
-        id: 'chat-v1',
-        version: '1.0.0',
-        /**
-         * الحد الأقصى لطول النص المُرسَل للمطالبة (بالأحرف) — يشمل السياق والاستعلام.
-         */
-        maxInputLength: 80000,
-        /**
-         * عدد المقاطع (chunks) القصوى التي يمكن تضمينها في السياق.
-         */
-        maxContextChunks: 20,
-      },
-    } as const,
+  /** إعدادات تحديد المعدل (Rate Limiting) للذكاء الاصطناعي */
+  readonly rateLimit: {
+    readonly maxRequestsPerTenant: number;
+    readonly windowMs: number;
+    readonly maxRequestsPerUser: number;
+  };
 
-    /**
-     * مسار مجلد المطالبات (نسبة إلى جذر المشروع).
-     * يُستخدم لتحميل المطالبات من ملفات خارجية.
-     */
-    storagePath: 'src/ai/prompts',
-  },
+  /** تأخير المحاكاة (mock) بالمللي ثانية – يُستخدم فقط في وضع mock */
+  readonly mockDelay: number;
+}
 
-  /**
-   * إعدادات إعادة المحاولة (Retry) المخصصة للذكاء الاصطناعي.
-   * تطبق استراتيجية تراجع أسي مع تشويش (Exponential Backoff + Jitter).
-   */
-  retry: {
-    /**
-     * الحد الأقصى لعدد محاولات إعادة المحاولة (من البيئة).
-     */
-    maxAttempts: envConfig.RETRY_MAX_ATTEMPTS,
+// ============================================================
+// 2. بناء كائن الإعدادات (بناءً على envConfig)
+// ============================================================
 
-    /**
-     * الزمن الأساسي للتراجع الأسي بالمللي ثانية (من البيئة).
-     */
-    backoffBaseMs: envConfig.RETRY_BACKOFF_BASE,
+/**
+ * بناء كائن الإعدادات من متغيرات البيئة.
+ * تطبق الفشل السريع: في حال عدم وجود مفتاح API أساسي، تُرمى استثناءً.
+ */
+export function buildAIConfig(env: EnvConfig = envConfig): Readonly<AIConfig> {
+  // التحقق من وجود مفتاح API (في وضع real فقط)
+  if (env.NODE_ENV === 'production' && !env.ANTHROPIC_API_KEY) {
+    throw new Error('❌ ANTHROPIC_API_KEY مطلوب في بيئة الإنتاج');
+  }
 
-    /**
-     * الحد الأقصى للزمن بين المحاولات (بالمللي ثانية) — لمنع التراجع المفرط.
-     * قيمة افتراضية: 30 ثانية.
-     */
-    maxBackoffMs: 30000,
+  // تحديد الوضع تلقائياً:
+  // - في بيئة الإنتاج ومع وجود مفتاح API → real
+  // - في بيئة التطوير أو عدم وجود مفتاح → mock
+  const hasValidApiKey = !!(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.startsWith('sk-'));
+  const mode: 'mock' | 'real' = (env.NODE_ENV === 'production' && hasValidApiKey) ? 'real' : 'mock';
 
-    /**
-     * قائمة بأكواد الخطأ القابلة لإعادة المحاولة (من Anthropic API).
-     */
-  retryableStatus : [429,500,502,503,504]
-  },
+  // القيم الافتراضية
+  const DEFAULT_MODEL = 'claude-3-sonnet-20241022';
+  const DEFAULT_MAX_TOKENS = 4096;
+  const DEFAULT_TEMPERATURE = 0.3;
+  const DEFAULT_TIMEOUT_MS = 30000;
+  const DEFAULT_MAX_PROMPT_LENGTH = 100000;
+  const DEFAULT_RETRYABLE_STATUS = [429, 500, 502, 503, 504] as const;
 
-  /**
-   * إعدادات التحقق من المخرجات (Output Validation) — §6.
-   * تُعرَّف المخططات (Zod Schemas) التي يجب أن تتطابق معها مخرجات AI.
-   */
-  validation: {
-    /**
-     * ما إذا كان التحقق إلزامياً (true) أم اختيارياً.
-     * إلزامي حسب الدستور §6.
-     */
-    enforceStrictValidation: true,
-
-    /**
-     * ما يجب فعله عند فشل التحقق:
-     * - 'retry': إعادة محاولة الطلب (مع استراتيجية الاحتياطي).
-     * - 'fallback': استخدام الرد الاحتياطي الفوري.
-     * - 'throw': رمي خطأ مصنف (الفشل السريع).
-     */
-    onValidationFailure: 'retry' as const,
-
-    /**
-     * الحد الأقصى لعدد محاولات إعادة التحقق قبل اللجوء إلى الاحتياطي أو الرمي.
-     */
-    maxRetriesOnValidationFailure: 2,
-  },
-
-  /**
-   * استراتيجية الاحتياطي (Fallback) — §6.
-   * تُحدد السلوك عند عدم توفر خدمة الذكاء الاصطناعي.
-   */
-  fallback: {
-    /**
-     * ما يجب فعله عند فشل جميع محاولات AI:
-     * - 'static': رد برسالة ثابتة مُعدَّة مسبقاً.
-     * - 'error': رمي خطأ مصنف (الفشل السريع).
-     * - 'queue': وضع الطلب في قائمة انتظار للمعالجة غير المتزامنة (BullMQ).
-     */
-    strategy: 'static' as const,
-
-    /**
-     * الرسالة الثابتة التي تُستخدم كرد احتياطي (إذا كانت الاستراتيجية 'static').
-     * تُوفَّر بلغة المستخدم (العربية هنا) مع إمكانية الترجمة لاحقاً.
-     */
-    staticResponse: {
-      ar: 'عذراً، خدمة الذكاء الاصطناعي غير متاحة حالياً. يرجى المحاولة مرة أخرى لاحقاً. إذا كانت المشكلة مستمرة، تواصل مع الدعم الفني.',
-      en: 'Sorry, the AI service is currently unavailable. Please try again later. If the issue persists, contact technical support.',
+  return Object.freeze({
+    anthropic: {
+      apiKey: env.ANTHROPIC_API_KEY || '',
+      model: env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      fallbackModel: env.ANTHROPIC_FALLBACK_MODEL || 'claude-3-haiku-20240307',
+      maxTokens: env.ANTHROPIC_MAX_TOKENS || DEFAULT_MAX_TOKENS,
+      temperature: env.ANTHROPIC_TEMPERATURE || DEFAULT_TEMPERATURE,
+      timeoutMs: env.CIRCUIT_BREAKER_TIMEOUT || DEFAULT_TIMEOUT_MS,
+      maxPromptLength: DEFAULT_MAX_PROMPT_LENGTH,
     },
-  },
+    mode,
+    circuitBreaker: {
+      timeoutMs: env.CIRCUIT_BREAKER_TIMEOUT || DEFAULT_TIMEOUT_MS,
+      errorThreshold: env.CIRCUIT_BREAKER_ERROR_THRESHOLD || 5,
+      halfOpenWaitMs: 60000,
+    },
+    retry: {
+      maxAttempts: env.RETRY_MAX_ATTEMPTS || 3,
+      backoffBaseMs: env.RETRY_BACKOFF_BASE || 1000,
+      maxBackoffMs: 30000,
+      retryableStatusCodes: DEFAULT_RETRYABLE_STATUS,
+    },
+    prompts: {
+      versions: {
+        embedding: {
+          id: 'embed-v1',
+          version: '1.0.0',
+          maxInputLength: 50000,
+        },
+        chat: {
+          id: 'chat-v1',
+          version: '1.0.0',
+          maxInputLength: 80000,
+          maxContextChunks: 20,
+        },
+      },
+      storagePath: 'src/ai/prompts',
+    },
+    validation: {
+      enforceStrictValidation: true,
+      onValidationFailure: 'retry' as const,
+      maxRetriesOnValidationFailure: 2,
+    },
+    fallback: {
+      strategy: 'static' as const,
+      staticResponse: {
+        ar: 'عذراً، خدمة الذكاء الاصطناعي غير متاحة حالياً. يرجى المحاولة مرة أخرى لاحقاً. إذا كانت المشكلة مستمرة، تواصل مع الدعم الفني.',
+        en: 'Sorry, the AI service is currently unavailable. Please try again later. If the issue persists, contact technical support.',
+      },
+    },
+    rateLimit: {
+      maxRequestsPerTenant: 50,
+      windowMs: 60000,
+      maxRequestsPerUser: 10,
+    },
+    mockDelay: 500,
+  });
+}
 
-  /**
-   * إعدادات قاطع الدائرة (Circuit Breaker) المخصصة للذكاء الاصطناعي.
-   * تُشتق من القيم العامة ولكن يمكن تخصيصها هنا إذا لزم الأمر.
-   */
-  circuitBreaker: {
-    /**
-     * المهلة بالمللي ثانية (مشتقة من envConfig).
-     */
-    timeoutMs: envConfig.CIRCUIT_BREAKER_TIMEOUT,
-
-    /**
-     * عدد الأخطاء المسموح بها قبل فتح الدائرة (مشتقة من envConfig).
-     */
-    errorThreshold: envConfig.CIRCUIT_BREAKER_ERROR_THRESHOLD,
-
-    /**
-     * مدة الانتظار قبل محاولة نصف فتح الدائرة (Half-Open) بالمللي ثانية.
-     * قيمة افتراضية: 60 ثانية.
-     */
-    halfOpenWaitMs: 60000,
-  },
-
-  /**
-   * إعدادات تحديد المعدل (Rate Limiting) للذكاء الاصطناعي.
-   * يتم تطبيقها على مستوى المستأجر/المستخدم.
-   */
-  rateLimit: {
-    /**
-     * الحد الأقصى لعدد الطلبات لكل مستأجر في النافذة الزمنية.
-     * قيمة افتراضية: 50 طلب لكل 60 ثانية (يمكن تعديلها حسب خطة المستأجر).
-     */
-    maxRequestsPerTenant: 50,
-
-    /**
-     * النافذة الزمنية لتحديد المعدل بالمللي ثانية.
-     * قيمة افتراضية: 60 ثانية.
-     */
-    windowMs: 60000,
-
-    /**
-     * الحد الأقصى لعدد الطلبات لكل مستخدم داخل المستأجر.
-     */
-    maxRequestsPerUser: 10,
-  },
-} as const;
+// ============================================================
+// 3. التصدير النهائي (مرة واحدة فقط)
+// ============================================================
 
 /**
- * استنتاج النوع من كائن aiConfig.
- * يضمن سلامة النوع 100% ولا وجود لـ `any`.
- * [مُتحقَّق منطقياً بتتبع كامل] — استدلال TypeScript مع `as const` يوفر نوعاً صارماً للقراءة فقط.
+ * كائن الإعدادات النهائي – يُستهلك في باقي التطبيق.
+ * مصدر واحد للحقيقة (SSoT) لإعدادات الذكاء الاصطناعي.
  */
-export type AIConfig = typeof aiConfig;
+export const aiConfig: Readonly<AIConfig> = buildAIConfig();
 
 /**
- * تصدير الكائن كافتراضي لسهولة الاستيراد في وحدات التطبيق.
+ * إسقاط آمن للإعدادات (للتسجيل والعرض).
+ * لا تُطبع aiConfig مباشرة أبداً في أي لوغ.
+ */
+export function getSafeAIConfig(): Record<string, unknown> {
+  return {
+    mode: aiConfig.mode,
+    anthropic: {
+      model: aiConfig.anthropic.model,
+      fallbackModel: aiConfig.anthropic.fallbackModel,
+      maxTokens: aiConfig.anthropic.maxTokens,
+      temperature: aiConfig.anthropic.temperature,
+      timeoutMs: aiConfig.anthropic.timeoutMs,
+      maxPromptLength: aiConfig.anthropic.maxPromptLength,
+      // apiKey محذوف عمداً
+    },
+    circuitBreaker: { ...aiConfig.circuitBreaker },
+    retry: { ...aiConfig.retry },
+    rateLimit: { ...aiConfig.rateLimit },
+  };
+}
+
+/**
+ * تصدير افتراضي لسهولة الاستيراد.
  */
 export default aiConfig;
-

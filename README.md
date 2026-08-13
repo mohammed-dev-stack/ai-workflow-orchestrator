@@ -11,7 +11,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)
 ![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express.js-5.x-000000?logo=express&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-7.x-47A248?logo=mongodb&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.x-4169E1?logo=postgresql&logoColor=white)
 ![Socket.io](https://img.shields.io/badge/Socket.io-4.x-010101?logo=socket.io)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -54,7 +54,7 @@
 
 Mansati (منصتي, "my platform") is a full social-networking product for Arabic-speaking users: profiles, a following graph, a reaction-and-comment post feed, private real-time messaging, live notifications, and content sharing — paired with a genuinely separate admin console for platform operators (user/content moderation, messaging oversight, analytics, system health).
 
-It's split cleanly along a client/server line: a **Next.js frontend** that owns UI, routing, and client-side real-time handling, talking over REST (Axios) and WebSocket (Socket.IO) to an **Express/MongoDB backend** that owns persistence, identity, and the authoritative real-time event bus.
+It's split cleanly along a client/server line: a **Next.js frontend** that owns UI, routing, and client-side real-time handling, talking over REST (Axios) and WebSocket (Socket.IO) to an **Express/PostgreSQL backend** that owns persistence, identity, and the authoritative real-time event bus.
 
 ## Why Mansati Exists
 
@@ -96,7 +96,7 @@ graph TB
         SOCK_BE[Socket Manager]
     end
 
-    DB[(MongoDB via Mongoose)]
+    DB[(PostgreSQL via Prisma)]
 
     UI --> SVC_FE
     UI --> CTX
@@ -106,7 +106,7 @@ graph TB
     SOCK_BE --> DB
 ```
 
-Two independently deployable services, joined by a typed HTTP contract and a live WebSocket channel — no shared runtime, no shared database access from the client. The frontend never touches MongoDB directly; every read or write goes through the backend's service layer.
+Two independently deployable services, joined by a typed HTTP contract and a live WebSocket channel — no shared runtime, no shared database access from the client. The frontend never touches PostgreSQL directly; every read or write goes through the backend's service layer.
 
 ## Repository Structure
 
@@ -124,7 +124,7 @@ mansati-backend/            (separate repository)
 ├── config/                   # DB connection & CORS configuration
 ├── controllers/               # Request-handling logic per route
 ├── middleware/                 # Auth, authorization, error handling
-├── models/                      # Mongoose schemas
+├── prisma/                      # Prisma schema definitions
 ├── routes/                       # API endpoint definitions
 ├── socket/                        # WebSocket event management
 ├── utils/                          # Helper functions
@@ -141,7 +141,7 @@ Next.js 15 (App Router) + React 19 + TypeScript. Route groups separate unauthent
 
 ## Backend Overview
 
-Node.js/Express, layered architecture (routes → middleware → controllers → services → MongoDB via Mongoose). Confirmed capabilities: JWT dual-token auth (access + refresh, HttpOnly cookies), Bcrypt password hashing, Helmet security headers, rate limiting, data sanitization, centralized error handling, Multer file uploads, and a Socket.IO manager for real-time events. Only 5 endpoints are directly documented at source (`/api/auth/register`, `/api/auth/login`, `/api/posts`, `/api/messages`, `/api/admin/stats`) — 🔍 the frontend's eight service modules imply a substantially larger API surface, but only the confirmed subset is asserted as fact.
+Node.js/Express, layered architecture (routes → middleware → controllers → services → PostgreSQL via Prisma). Confirmed capabilities: JWT dual-token auth (access + refresh, HttpOnly cookies), Bcrypt password hashing, Helmet security headers, rate limiting, data sanitization, centralized error handling, Multer file uploads, and a Socket.IO manager for real-time events. Only 5 endpoints are directly documented at source (`/api/auth/register`, `/api/auth/login`, `/api/posts`, `/api/messages`, `/api/admin/stats`) — 🔍 the frontend's eight service modules imply a substantially larger API surface, but only the confirmed subset is asserted as fact.
 
 **Full detail:** [`mansati-backend` README](https://github.com/mohammed-dev-stack/mansati-backend) — covers architecture layering, auth flow, and the honest gap list (logging, validation library, deployment target — all currently undocumented).
 
@@ -153,7 +153,7 @@ Node.js/Express, layered architecture (routes → middleware → controllers →
 sequenceDiagram
     participant Client
     participant BE as Backend (Express)
-    participant DB as MongoDB
+    participant DB as PostgreSQL
 
     Client->>BE: POST /api/auth/login
     BE->>DB: verify credentials (bcrypt compare)
@@ -183,7 +183,7 @@ Confirmed controls, split by owner:
 | Session tokens | Backend (issues) / Frontend (attaches) | JWT access + refresh, HttpOnly cookies |
 | HTTP security headers | Backend | Helmet.js |
 | Brute-force / flood protection | Backend | Rate limiting (thresholds: ⚠️ insufficient evidence from repository) |
-| Injection protection | Backend | Data sanitization (NoSQL injection) |
+| Injection protection | Backend | Data sanitization (SQL injection) |
 | Route/role gating | Both | Backend middleware is authoritative; frontend also gates navigation |
 | Client-side input/URL sanitization | Frontend | `sanitizeInput`, `sanitizeImageUrl` utilities |
 
@@ -191,7 +191,7 @@ Confirmed controls, split by owner:
 
 ## Scalability Overview
 
-The stack (stateless-friendly JWT auth, MongoDB, Socket.IO) is *compatible* with horizontal scaling in principle. ⚠️ **Insufficient evidence from repository** exists for: a Socket.IO multi-instance adapter (a Redis pub/sub adapter is *required*, not optional, the moment more than one backend process runs — raw Socket.IO does not fan out broadcasted events across separate Node processes on its own), database indexing strategy, a caching layer, containerization, or load-test results. For a product where live chat is a core feature, this is a real gap to close before scaling backend instances horizontally — not a cosmetic documentation omission.
+The stack (stateless-friendly JWT auth, PostgreSQL, Socket.IO) is *compatible* with horizontal scaling in principle. ⚠️ **Insufficient evidence from repository** exists for: a Socket.IO multi-instance adapter (a Redis pub/sub adapter is *required*, not optional, the moment more than one backend process runs — raw Socket.IO does not fan out broadcasted events across separate Node processes on its own), database indexing strategy, a caching layer, connection pooling configuration, containerization, or load-test results. For a product where live chat is a core feature, this is a real gap to close before scaling backend instances horizontally — not a cosmetic documentation omission.
 
 ---
 
@@ -203,7 +203,7 @@ Each repository is developed and run independently:
 # Backend
 git clone https://github.com/mohammed-dev-stack/mansati-backend.git
 cd mansati-backend && npm install
-cp .env.example .env   # set MongoDB URI and required secrets
+cp .env.example .env   # set DATABASE_URL and required secrets
 npm run dev             # http://localhost:5000
 
 # Frontend
@@ -221,7 +221,7 @@ The backend must be running before the frontend — auth, feed, and real-time fe
 |---|---|---|
 | 1. Clone backend | `git clone .../mansati-backend.git` | |
 | 2. Install backend deps | `npm install` | Requires Node.js 20+ |
-| 3. Configure backend env | Copy `.env.example` → `.env`, set `MONGODB_URI` | See backend README for the full expected variable set |
+| 3. Configure backend env | Copy `.env.example` → `.env`, set `DATABASE_URL` | See backend README for the full expected variable set |
 | 4. Start backend | `npm run dev` | Defaults to `http://localhost:5000` |
 | 5. Clone frontend | `git clone .../mansati-frontend.git` | |
 | 6. Install frontend deps | `npm install` | |
@@ -232,13 +232,13 @@ The backend must be running before the frontend — auth, feed, and real-time fe
 
 ## Deployment Architecture
 
-The frontend has a confirmed live preview on **Vercel**, a natural fit for a Next.js App Router app (zero-config SSR, automatic deploys). ⚠️ **Insufficient evidence from repository** for the backend's deployment target — no Dockerfile, hosting platform, or CI/CD pipeline is documented for `mansati-backend`. Given it's a stateful Node/Express process with WebSocket connections, it is **not** deployable as-is to a pure serverless/edge target the way the frontend is — it needs a persistent process host and a reachable MongoDB instance (Atlas or self-hosted).
+The frontend has a confirmed live preview on **Vercel**, a natural fit for a Next.js App Router app (zero-config SSR, automatic deploys). ⚠️ **Insufficient evidence from repository** for the backend's deployment target — no Dockerfile, hosting platform, or CI/CD pipeline is documented for `mansati-backend`. Given it's a stateful Node/Express process with WebSocket connections, it is **not** deployable as-is to a pure serverless/edge target the way the frontend is — it needs a persistent process host and a reachable PostgreSQL instance (managed or self-hosted).
 
 ```mermaid
 graph LR
     User[Browser] -->|HTTPS| Vercel[Frontend - Vercel - confirmed]
     Vercel -->|REST + WebSocket| Backend["Backend - hosting target:\ninsufficient evidence"]
-    Backend --> Mongo[("MongoDB:\nhosting target insufficient evidence")]
+    Backend --> Postgres[("PostgreSQL:\nhosting target insufficient evidence")]
 ```
 
 ## Documentation
@@ -279,7 +279,7 @@ Both repositories are documented as **MIT licensed** — see each repo's `LICENS
 ## Author & Contact
 
 **Mohammed Qannan**
-Full-Stack Developer — Next.js, React, and TypeScript on the client; Node.js, Express, and MongoDB on the server. Built and documented both halves of Mansati independently.
+Full-Stack Developer — Next.js, React, and TypeScript on the client; Node.js, Express, and PostgreSQL on the server. Built and documented both halves of Mansati independently.
 
 **Project links**
 - Frontend repository: https://github.com/mohammed-dev-stack/mansati-frontend

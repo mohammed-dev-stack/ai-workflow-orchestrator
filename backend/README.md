@@ -1,403 +1,411 @@
-# AI Workflow Orchestrator — Backend
+<div align="center">
 
-Human-in-the-loop orchestration engine for AI-driven workflows. Executes multi-step workflows via a BullMQ job queue, pauses at steps that require human approval, and persists all state in MongoDB.
+# منصتي — Mansati Backend API
 
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=nodedotjs)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Express](https://img.shields.io/badge/Express-4.22-000000?logo=express)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-6.x-47A248?logo=mongodb)](https://www.mongodb.com/)
-[![BullMQ](https://img.shields.io/badge/BullMQ-5.79-FF6B6B)](https://bullmq.io/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+### The service layer powering the Mansati Arabic social platform.
+
+![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express.js-5.x-000000?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-7.x-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Socket.io-4.x-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+
+</div>
+
+> **How to read this document.** Every claim below is tagged: **✅ Confirmed** (stated directly in this repository's own documentation), **🔍 Inferred** (not confirmed here, but strongly implied by the frontend's documented service layer — e.g., a `followService.ts` implies follow/unfollow endpoints exist somewhere), **⚠️ Not documented** (a real gap — no evidence either way), or **📋 Planned** (explicitly future work, not present). No test-coverage or CI badges are included above because none of those systems are documented as existing yet.
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [API Reference](#api-reference)
-- [Core Systems](#core-systems)
-- [Known Limitations](#known-limitations)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+1. [Overview](#overview)
+2. [What This Is & Why It Exists](#what-this-is--why-it-exists)
+3. [System Architecture](#system-architecture)
+4. [API Architecture](#api-architecture)
+5. [Authentication Flow](#authentication-flow)
+6. [Authorization Model](#authorization-model)
+7. [Database Architecture](#database-architecture)
+8. [Security Architecture](#security-architecture)
+9. [Validation Layer](#validation-layer)
+10. [Error Handling Strategy](#error-handling-strategy)
+11. [Logging Strategy](#logging-strategy)
+12. [Rate Limiting](#rate-limiting)
+13. [Real-time Architecture (Socket.IO)](#real-time-architecture-socketio)
+14. [Performance Considerations](#performance-considerations)
+15. [Scalability Considerations](#scalability-considerations)
+16. [Folder Structure](#folder-structure)
+17. [Environment Variables](#environment-variables)
+18. [Installation & Setup](#installation--setup)
+19. [Development Workflow](#development-workflow)
+20. [Deployment](#deployment)
+21. [Monitoring Considerations](#monitoring-considerations)
+22. [Future Improvements](#future-improvements)
+23. [Contributing Guide](#contributing-guide)
+24. [License](#license)
+25. [Author & Contact](#author--contact)
 
 ---
 
 ## Overview
 
-The backend accepts a **workflow template** (an ordered list of steps, each mapped to a tool such as `send_email`, `create_calendar_event`, or `create_jira_ticket`), and executes it as a **run**. Each run is processed asynchronously by a BullMQ worker calling into a state-machine orchestrator.
+✅ **Confirmed**: Mansati's backend is a Node.js/Express + MongoDB (via Mongoose) service that provides a REST API and a Socket.IO real-time channel to the companion [Next.js frontend](https://github.com/mohammed-dev-stack/mansati-frontend). It follows a layered/clean architecture: routes → middleware → controllers → services → data layer, with services as the only layer documented as touching the database.
 
-Two things distinguish this from a plain job queue:
+## What This Is & Why It Exists
 
-- **Human-in-the-loop approval** — any step flagged `requiresApproval` pauses the run (`waiting_approval`) until a human calls the approve/reject endpoint.
-- **Mock / Real AI mode** — the orchestrator can run entirely without calling the Anthropic API (`AI_MODE=mock`), generating deterministic placeholder content, or switch to the real Claude API at runtime via a settings endpoint.
+The frontend needs an authority it can't be: something that owns passwords (hashed, never in the client), enforces who's allowed to see or delete what, and fans real-time events out to every connected client consistently. That's this service's job. The layered structure exists for a specific reason beyond "best practice" — it's what lets the admin console, the public feed, and the real-time layer all share one business-rule implementation (the services layer) instead of three route handlers quietly reimplementing "what counts as a valid post" slightly differently.
 
-Communication: REST API (Express) for the frontend, MongoDB (Mongoose) for persistence, Redis + BullMQ for the job queue.
+🔍 **Inferred from frontend service layer**: the frontend ships eight distinct service modules (`api`, `adminService`, `followService`, `messageService`, `notificationService`, `postService`, `socketService`, `userService`), which means the actual API surface this backend exposes is materially larger than the 5 endpoints confirmed in source — see [API Architecture](#api-architecture) for the inferred breakdown.
 
 ---
 
-## Architecture
+## System Architecture
 
 ```mermaid
 graph TD
-    A[Express Router] --> B[Controllers]
-    B --> C[WorkflowService]
-    C --> D[(MongoDB: Workflow / WorkflowRun)]
-    C --> E[BullMQ Queue]
-    E --> F[RunWorker]
-    F --> G[Orchestrator State Machine]
-    G --> D
-    G --> H[AI Service — mock or Anthropic API]
-    G --> I[Slack Webhook Notification]
+    A[Client - Next.js frontend] -->|HTTP| B[Routes / API layer]
+    A -->|WebSocket| G[Socket Manager]
+    B --> C[Middleware - Auth & Security]
+    C --> D[Controllers - Request handling]
+    D --> E[Services - Business rules]
+    E --> F[(MongoDB via Mongoose)]
+    D --> G
+    G --> F
 ```
 
-The codebase separates concerns into distinct layers:
+✅ **Confirmed layer responsibilities:**
 
-- **`api/`** — Express controllers and routes. Thin: validates input shape, delegates to services, formats the HTTP response.
-- **`services/`** — Business logic (`WorkflowService`, `AIService`). No knowledge of `req`/`res`.
-- **`core/`** — `Orchestrator`, the state machine that drives a run from step to step.
-- **`models/`** — Mongoose schemas (`Workflow`, `WorkflowRun`) with their own validation rules and pre-save hooks.
-- **`config/`** — Centralized, Zod-validated environment access. This is the only layer allowed to read `process.env` directly.
-- **`queues/` / `workers/`** — BullMQ queue definition and the worker process that consumes jobs.
-- **`utils/`** — Logger (Winston), error handling (`AppError`), AI-mode state, redaction helpers.
+| Layer | Responsibility |
+|---|---|
+| **Routes** | Define API endpoints, map HTTP verbs/paths to controllers |
+| **Middleware** | Authentication/authorization checks, security headers, centralized error handling |
+| **Controllers** | Request/response handling — parse input, call services, shape the response |
+| **Services** | Business rules — the only layer documented as talking to the data layer |
+| **Models** | Mongoose schemas (⚠️ field-level schema not documented in source) |
+| **Socket Manager** | WebSocket event handling for chat/notifications, running alongside the controller layer |
 
 ---
 
-## Tech Stack
+## API Architecture
 
-| Layer | Technology | Version (package.json) | Notes |
+✅ **Confirmed** (5 representative endpoints, explicitly documented):
+
+| Domain | Method | Path | Purpose |
 |---|---|---|---|
-| Runtime | Node.js | >=20 (engines not pinned in package.json; TS target ES2022) | |
-| Language | TypeScript | ^5.6 (installed: 5.9.3) | `strict: true`, `noUncheckedIndexedAccess: true` |
-| Framework | Express | ^4.21 (installed: 4.22.2) | |
-| Database | MongoDB via Mongoose | mongoose ^8.6 | |
-| Queue | BullMQ + ioredis | bullmq ^5.12 (installed 5.79), ioredis ^5.3 | |
-| AI | `@anthropic-ai/sdk` | ^0.30.1 | Client is instantiated lazily; only used when `AI_MODE=real` |
-| Validation | Zod | ^4.4 (backend `envSchema`); note the root `package.json` devDependencies also lists `zod: ^3.23.8` — see [Known Limitations](#known-limitations) | |
-| Logging | Winston | ^3.14 (installed 3.19) | Console + rotating file transports |
-| Security headers | Helmet | ^7.1 (installed 7.2) | |
-| Compression | `compression` | ^1.8 | |
+| Auth | `POST` | `/api/auth/register` | Register a new user |
+| Auth | `POST` | `/api/auth/login` | Log in |
+| Posts | `GET` | `/api/posts` | Fetch posts |
+| Messages | `POST` | `/api/messages` | Send a message |
+| Admin | `GET` | `/api/admin/stats` | Dashboard statistics |
+
+🔍 **Inferred from frontend service layer** — each frontend service module implies a corresponding backend surface. These are **not confirmed** endpoints; they are the minimum API shape needed to support what the frontend README documents as working functionality. Treat method/path spellings as illustrative, not authoritative — only the *existence* of the capability is a reasonable inference, not the exact route signature:
+
+| Domain | Frontend service | Implied capabilities |
+|---|---|---|
+| Users | `userService.ts` | Registration, login, profile update, avatar/cover upload |
+| Follow | `followService.ts` | Follow, unfollow, follow-status check, list followers/following |
+| Posts | `postService.ts` | Create/read/update/delete posts, add reactions (7 types), comment, share |
+| Messages | `messageService.ts` | Send/receive messages, list conversations, mark read, search users |
+| Notifications | `notificationService.ts` | List notifications, mark as read (single/all), delete |
+| Admin | `adminService.ts` | Dashboard stats, user management (list/filter/delete/enable-disable/role edit, bulk actions), post management (list/filter/delete, bulk), message management (list/delete, bulk), analytics (time-range charts), system health, settings (read/write) |
+
+⚠️ **Not documented**: request/response body shapes, pagination conventions, API versioning, or a complete verified route inventory. The table above is a planning aid for verifying against `routes/`, not a substitute for reading it.
+
+**Request lifecycle** (✅ confirmed shape, from the architecture layering):
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Route
+    participant Middleware as Auth Middleware
+    participant Controller
+    participant Service
+    participant DB as MongoDB
+
+    Client->>Route: HTTP request (+ JWT)
+    Route->>Middleware: verify token / role
+    alt invalid or missing token
+        Middleware-->>Client: 401 / 403
+    else valid token
+        Middleware->>Controller: forward request
+        Controller->>Service: execute business logic
+        Service->>DB: query/mutate via Mongoose
+        DB-->>Service: result
+        Service-->>Controller: processed data
+        Controller-->>Client: JSON response
+    end
+```
 
 ---
 
-## Project Structure
+## Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AuthCtrl as Auth Controller
+    participant Service as Auth Service
+    participant DB as MongoDB
+
+    Client->>AuthCtrl: POST /api/auth/login (credentials)
+    AuthCtrl->>Service: validate credentials
+    Service->>DB: look up user, compare hash (bcrypt)
+    DB-->>Service: user record
+    Service-->>AuthCtrl: issue Access Token + Refresh Token
+    AuthCtrl-->>Client: tokens set as HttpOnly cookies
+
+    Note over Client,AuthCtrl: Subsequent requests
+    Client->>AuthCtrl: request + cookie (Access Token)
+    AuthCtrl->>AuthCtrl: verify Access Token
+    alt expired
+        Client->>AuthCtrl: refresh using Refresh Token
+        AuthCtrl-->>Client: new Access Token
+    end
+```
+
+✅ **Confirmed**:
+- Dual-token JWT model — separate Access and Refresh tokens.
+- Both tokens documented as stored in **HttpOnly cookies**.
+- Password hashing via **Bcrypt.js**.
+
+⚠️ **Cross-repository inconsistency, unresolved**: the frontend's own documentation states token storage two different ways in two different sections — HttpOnly cookies in one place, `sessionStorage` (with a cookie fallback) in another. This backend's documentation asserts HttpOnly cookies, which is what a security-conscious implementation should do — but "should" isn't "does." This should be resolved by reading the actual `Set-Cookie` logic in the auth controller and the frontend's Axios interceptor together, not by picking whichever claim sounds more secure.
+
+⚠️ **Not documented**: token expiry durations, refresh-token rotation/invalidation policy (does a used refresh token get revoked?), and whether logout performs server-side token revocation or is purely a client-side cookie clear.
+
+---
+
+## Authorization Model
+
+✅ **Confirmed**: role-gated access exists. An admin-only endpoint (`GET /api/admin/stats`) is documented, and the frontend independently confirms an admin role via a dedicated bootstrap flow (`/admin-login`, creating the first super-admin from env credentials) and a role-editing UI for other users.
+
+🔍 **Inferred**: given the frontend's admin console covers user, post, and message *moderation* (delete, disable, bulk actions) as well as settings and analytics, the authorization model most likely gates each of those admin routes individually via middleware, rather than a single blanket "is-admin" check protecting only the dashboard — but this is architecture the frontend's feature list implies, not something confirmed in backend source.
+
+⚠️ **Not documented**: the specific role enum (`user` / `admin` only, or more granular?), whether any resource-level authorization exists (e.g., can a user only edit their *own* post — this is almost certainly true given how post editing is described, but no ownership-check middleware is confirmed in source), or the exact middleware implementation (custom vs. a library).
+
+---
+
+## Database Architecture
+
+```mermaid
+erDiagram
+    USER ||--o{ POST : creates
+    USER ||--o{ MESSAGE : sends
+    USER }o--o{ USER : follows
+    POST ||--o{ COMMENT : has
+    POST ||--o{ REACTION : has
+    USER ||--o{ NOTIFICATION : receives
+```
+
+✅ **Confirmed**: MongoDB via Mongoose ODM.
+
+⚠️ **Not documented — this diagram is a hypothesis, not a schema.** No `models/` file contents were provided, so collection names, field definitions, indexes, and actual relationships (e.g., is `follows` its own collection or an array on `User`? are reactions a subdocument on `Post` or their own collection?) are unverified. The entities and edges above are drawn from the frontend's *feature* list (users create posts, follow other users, send messages, react/comment on posts, receive notifications) — they describe the product's data shape, not the database's. Validate against `models/` before treating this as documentation.
+
+---
+
+## Security Architecture
+
+✅ **Confirmed, backend-owned controls:**
+
+- JWT authentication with Access/Refresh tokens in HttpOnly cookies.
+- Password hashing via Bcrypt.js — plaintext passwords never persisted.
+- Security headers via `Helmet.js`.
+- Rate limiting, described as DDoS/brute-force protection (see [Rate Limiting](#rate-limiting) for what's unconfirmed).
+- Data sanitization, described as NoSQL-injection protection.
+- CORS configuration, managed in `config/`.
+- Centralized error handling, isolating internal error detail from clients.
+
+⚠️ **Not documented**: CSP policy specifics, dependency-audit/SCA tooling (e.g., `npm audit` in CI, Snyk), secrets-management approach beyond `.env`, or a documented threat model.
+
+---
+
+## Validation Layer
+
+⚠️ **Not documented in source.** Data sanitization is confirmed (NoSQL-injection framing), but no specific validation library (Joi, Zod, express-validator, class-validator) or schema definitions are shown. 🔍 **Inferred**: given the layered architecture diagram, request validation most plausibly sits in `middleware/` ahead of controllers — but that's an architectural inference from where validation *would* belong, not a confirmed file-level detail.
+
+---
+
+## Error Handling Strategy
+
+✅ **Confirmed**: centralized/global error handling is an explicit documented design goal, implemented as Express error-handling middleware (the natural home for it given the Middleware layer sits between routes and controllers in the architecture diagram).
+
+⚠️ **Not documented**: the actual error-response shape/contract (status codes, message format, whether errors carry a machine-readable code), whether errors are classified as operational vs. programmer errors, and whether uncaught exceptions or unhandled promise rejections have process-level handlers (`process.on('uncaughtException', ...)`, etc.) — this last one matters for whether the process crashes cleanly or hangs on an unexpected error.
+
+---
+
+## Logging Strategy
+
+⚠️ **Not documented in source.** No logging library (Winston, Pino, `morgan` for HTTP logs), log destination, or log-level strategy is specified anywhere in the available documentation. This is a real observability gap, not a stylistic omission — without structured logs, diagnosing a production incident means SSH-ing in and reading raw console output, if that's even captured. See [Future Improvements](#future-improvements).
+
+---
+
+## Rate Limiting
+
+✅ **Confirmed to exist**, described as protection against DDoS and brute-force attacks.
+
+⚠️ **Not documented**: which library implements it (`express-rate-limit` is the common default for this stack, but that's a guess, not a confirmed fact), which routes it covers (all routes vs. auth-only — the latter is more common and more likely given the "brute-force" framing specifically calls out login), request thresholds, or window durations. Until this is documented, don't assume `/api/posts` is rate-limited just because `/api/auth/login` almost certainly is.
+
+---
+
+## Real-time Architecture (Socket.IO)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant SocketMgr as Socket Manager
+    participant DB as MongoDB
+
+    Client->>SocketMgr: connect (with auth token)
+    SocketMgr->>SocketMgr: verify token
+    alt invalid token
+        SocketMgr-->>Client: connection rejected
+    else valid token
+        SocketMgr-->>Client: connection established
+        loop live session
+            Client->>SocketMgr: emit event (e.g. send message)
+            SocketMgr->>DB: persist event data
+            SocketMgr-->>Client: broadcast to relevant recipient(s)
+        end
+    end
+```
+
+✅ **Confirmed**: a dedicated `socket/` layer manages WebSocket events for chat and notifications, running alongside (not instead of) the REST controller layer — the architecture diagram shows controllers and the socket manager as siblings, both able to reach the service/data layer.
+
+🔍 **Inferred from frontend service layer**: the frontend's `socketService.ts` and its documented consumers (`ChatBox` for messages/typing, `NotificationBell` for live notification delivery) imply the backend emits at minimum: new-message events, typing-indicator events, and new-notification events. Presence/online-status is also referenced in the frontend's user-search feature ("showing online status"), implying a presence event exists — but none of these event names, payload shapes, or room/namespace conventions are confirmed in backend source.
+
+⚠️ **Not documented**: authentication mechanism for the socket handshake specifically (token in handshake auth payload vs. query string vs. cookie), room/namespace structure, and whether disconnect/reconnect triggers any server-side cleanup (e.g., marking a user offline).
+
+---
+
+## Performance Considerations
+
+✅ **Confirmed capabilities:**
+- **Multer**-based file/image upload handling.
+- **Socket.IO** for real-time delivery, avoiding polling.
+- Layered architecture keeps controllers thin, making later targeted optimization (e.g., service-layer caching) tractable without restructuring.
+
+⚠️ **Not documented**: caching layer (Redis or otherwise), database indexing strategy, connection pooling configuration, or any load-testing results. Given MongoDB is confirmed but schemas aren't, it's not possible to assess whether common query patterns (e.g., fetching a feed sorted by recency, or a user's follower list) are actually indexed — this is worth checking directly in `models/` before scaling traffic.
+
+---
+
+## Scalability Considerations
+
+⚠️ **Not directly documented.** The confirmed stack (JWT auth — stateless-friendly, MongoDB, Socket.IO) is *compatible* with horizontal scaling in principle, but none of the following are confirmed: a Socket.IO adapter for multi-instance pub/sub (a **Redis adapter is required**, not optional, the moment you run more than one backend process — raw Socket.IO doesn't fan out broadcasted events across separate Node processes on its own), containerization, or a process manager (PM2, etc.) for restart/zero-downtime-deploy handling. Treat single-instance operation as the current, confirmed reality.
+
+---
+
+## Folder Structure
 
 ```
 backend/
-├── src/
-│   ├── api/
-│   │   ├── controllers/
-│   │   │   ├── workflow.controller.ts   # Workflow/run/approval logic, called by routes
-│   │   │   ├── settings.controller.ts   # AI mode get/set/status (current, used by routes.ts)
-│   │   │   └── AISettings.ts            # Earlier version of the same controller, not wired into routes.ts
-│   │   └── routes.ts                    # All route definitions + inline auth middleware
-│   ├── config/
-│   │   ├── schema.ts                    # Zod schema — single source of truth for env vars
-│   │   ├── env.ts                       # Loads and freezes validated env; throws on invalid config
-│   │   ├── ai.config.ts                 # Derives AI config from env
-│   │   ├── database.config.ts           # Mongo connect/disconnect/health-check with retry
-│   │   ├── redis.config.ts              # Redis client lifecycle + health-check
-│   │   ├── types.ts                     # Shared HealthCheckResult type
-│   │   └── index.ts                     # Public barrel export for the rest of the app
-│   ├── core/
-│   │   └── StateMachine.orchestrator.ts # The workflow execution engine
-│   ├── models/
-│   │   ├── Workflow.model.ts            # Workflow template schema
-│   │   └── WorkflowRun.model.ts         # Run instance schema
-│   ├── queues/
-│   │   └── run.queue.ts                 # BullMQ queue + job helper functions
-│   ├── services/
-│   │   ├── workflow.service.ts          # CRUD + execution + stats for workflows/runs
-│   │   └── ai.service.ts                # Mock/real content generation (separate from the orchestrator's own mock logic)
-│   ├── utils/
-│   │   ├── logger.ts                    # Winston logger, HTTP logger, redaction
-│   │   ├── errorHandler.ts              # AppError, global error handler, catchAsync
-│   │   ├── aiMode.ts                    # In-memory AI mode state (mock/real) + mock content generator
-│   │   └── redact.ts                    # Generic object/URI credential redaction
-│   ├── workers/
-│   │   └── run.worker.ts                # BullMQ worker: consumes jobs, calls Orchestrator.process
-│   └── app.ts                           # Express bootstrap, health endpoint, graceful shutdown
-├── .env.example
-├── package.json
-└── tsconfig.json
+├── config/             # Database connection & CORS configuration
+├── controllers/        # Request-handling logic per route
+├── middleware/         # Auth, authorization, and error-handling middleware
+├── models/             # Mongoose schema definitions
+├── routes/             # API endpoint definitions
+├── socket/             # WebSocket event management (Socket.IO)
+├── utils/              # Helper functions
+├── .env.example        # Required environment variable template
+└── server.js           # Application entry point
 ```
 
-**Note on duplication:** `settings.controller.ts` and `AISettings.ts` implement near-identical AI-mode endpoints. Only `settings.controller.ts` is imported by `routes.ts`; `AISettings.ts` appears to be a leftover from an earlier refactor and is currently dead code.
+*(✅ Confirmed structure and one-line purpose per folder; internal file-level contents of each folder are not documented — see the domain-specific sections above for what is/isn't known about each.)*
 
 ---
 
-## Prerequisites
+## Environment Variables
 
-| Dependency | Version | Verify |
+✅ **Confirmed**: a `.env.example` template exists, and a MongoDB connection string is explicitly required.
+
+⚠️ **Not enumerated in source** beyond that. The table below lists what a service with this confirmed feature set (JWT dual-token auth, MongoDB, CORS-restricted API, file uploads) would need at minimum — treat it as a checklist to verify against the real `.env.example`, not as a confirmed variable list:
+
+| Variable (expected) | Confirmed? | Purpose |
 |---|---|---|
-| Node.js | >=20.0.0 | `node --version` |
-| npm | >=10.0.0 | `npm --version` |
-| MongoDB | >=6.0 | `mongod --version` |
-| Redis | >=7.0 | `redis-server --version` |
+| `MONGODB_URI` | ✅ Confirmed required | Database connection string |
+| `JWT_ACCESS_SECRET` | ⚠️ Not documented (expected, given dual-token JWT) | Signs access tokens |
+| `JWT_REFRESH_SECRET` | ⚠️ Not documented (expected) | Signs refresh tokens |
+| `PORT` | ⚠️ Not documented (expected; frontend assumes `5000`) | Server listen port |
+| `CORS_ORIGIN` | ⚠️ Not documented (expected, given confirmed CORS config) | Allowed frontend origin(s) |
+
+Consult the repository's actual `.env.example` for the authoritative list before deploying.
 
 ---
 
-## Quick Start
+## Installation & Setup
+
+**Prerequisites**: Node.js LTS (20+), a reachable MongoDB instance.
 
 ```bash
-# 1. Install dependencies (uses the committed package-lock.json)
-cd backend
-npm ci
-
-# 2. Configure environment
+git clone https://github.com/mohammed-dev-stack/mansati-backend.git
+cd mansati-backend
+npm install
 cp .env.example .env
-# Edit .env — at minimum set MONGO_URI; leave AI_MODE=mock to avoid API costs
-
-# 3. Start MongoDB and Redis locally (however you normally run them)
-
-# 4. Run in dev mode (nodemon + ts-node)
+# edit .env: set MongoDB URI and any other required variables
 npm run dev
-
-# 5. Verify
-curl http://localhost:5000/health
 ```
 
-Expected response shape (see `app.ts`):
+**Troubleshooting**
 
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-07-09T08:30:00.000Z",
-  "uptime": 12.3,
-  "version": "1.0.0",
-  "services": {
-    "mongodb": { "status": "connected" },
-    "redis": { "status": "connected" },
-    "ai": { "mode": "mock", "label": "🧪 Mock (Free - No Cost)", "configured": false }
-  },
-  "memory": { "rss": "80MB", "heapTotal": "40MB", "heapUsed": "30MB" },
-  "requestId": "req_..."
-}
-```
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Server fails to start / crashes immediately | Missing or invalid `MONGODB_URI` | Confirm `.env` is populated and MongoDB is reachable from this machine |
+| Frontend gets CORS errors | `CORS_ORIGIN` not configured for the frontend's dev URL | Confirm the backend's CORS config allows `http://localhost:3000` (or your frontend's actual origin) |
+| Frontend requests get 401 immediately | JWT secret misconfigured, or cookies not being set/read due to origin mismatch | Verify JWT secrets are set and that both apps agree on cookie domain/`SameSite` settings during local dev |
+| Real-time features don't connect | Socket.IO server not mounted on the same port as the HTTP server, or `NEXT_PUBLIC_SOCKET_URL` mismatch on the frontend | Confirm the socket manager is initialized against the same `server.js` HTTP server instance |
 
-Build/run commands actually defined in `package.json`:
+## Development Workflow
 
 ```bash
-npm run build   # tsc -> dist/
-npm start       # node dist/app.js
-npm run dev     # nodemon src/app.ts
+npm run dev
 ```
 
-There are no `test`, `lint`, or `db:migrate` scripts defined in `package.json` at this time — see [Known Limitations](#known-limitations).
+✅ **Confirmed**: this starts the server in development mode. ⚠️ **Not documented**: the exact contents of `npm run dev` (nodemon vs. a custom watch script) or any other `package.json` scripts (test, lint, build) — none were provided in source. The companion frontend expects this service at `http://localhost:5000` by default, so keep ports aligned across both repos during local development.
 
----
+## Deployment
 
-## Configuration
+⚠️ **Not documented in source** — no Dockerfile, CI/CD pipeline, or named hosting target (Render, Railway, a VPS, etc.) is specified. Given the confirmed stack, any real deployment target needs:
+- A **persistent Node process**, not a serverless function — the stateful WebSocket connections rule out most serverless platforms as a direct fit.
+- A reachable **MongoDB instance** (Atlas or self-hosted).
+- **CORS/env configuration** pointed at the deployed frontend's actual origin, not `localhost`.
 
-All environment variables are declared and validated in `src/config/schema.ts` using Zod. The process **refuses to start** if validation fails (`env.ts` throws before anything else runs) — this is enforced today, not aspirational.
+Document the real target once confirmed — this section should not be treated as deployment instructions today.
 
-| Variable | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `NODE_ENV` | enum | No | `development` | `development \| staging \| production \| test` |
-| `MONGO_URI` | string | **Yes** | — | Must start with `mongodb://` or `mongodb+srv://` (format check only) |
-| `MONGO_MAX_POOL_SIZE` | number | No | `10` | |
-| `MONGO_MIN_POOL_SIZE` | number | No | `2` | |
-| `MONGO_SOCKET_TIMEOUT_MS` | number | No | `45000` | |
-| `MONGO_SERVER_SELECTION_TIMEOUT_MS` | number | No | `5000` | |
-| `MONGO_CONNECT_RETRIES` | number | No | `5` | |
-| `MONGO_CONNECT_RETRY_DELAY_MS` | number | No | `2000` | |
-| `REDIS_HOST` | string | No | `localhost` | |
-| `REDIS_PORT` | number | No | `6379` | |
-| `REDIS_PASSWORD` | string | No | — | |
-| `REDIS_TLS` | `'true' \| 'false'` | No | `'false'` | Deliberately restricted to a literal enum rather than `z.coerce.boolean()` — see comment in `schema.ts` on why boolean coercion of env strings is unsafe |
-| `REDIS_MAX_RETRIES_PER_REQUEST` | number | No | `3` | |
-| `REDIS_CONNECT_TIMEOUT_MS` | number | No | `10000` | |
-| `ANTHROPIC_API_KEY` | string | Conditional | — | Required only when `AI_MODE=real`, enforced by a Zod `.refine()` on the whole schema |
-| `AI_MODEL` | string | No | `claude-3-5-sonnet-20241022` | |
-| `AI_MAX_TOKENS` | number | No | `1024` | |
-| `AI_TEMPERATURE` | number | No | `0.3` | |
-| `AI_MODE` | enum | No | `mock` | `mock \| real` |
-| `AI_MOCK_DELAY` | number | No | `500` | Declared in schema; not currently read anywhere in the mock code path |
-| `SLACK_WEBHOOK_URL` | string | No | — | Read directly via `process.env` in the orchestrator, not part of `envSchema` |
-| `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_WINDOW_MS` | number | No | — | Present in `.env.example`; no rate-limiting middleware is currently wired into `app.ts` |
+## Monitoring Considerations
 
-Setup:
+⚠️ **Not documented in source.** No APM integration, health-check endpoint, or uptime monitoring is specified. A `GET /health` or `GET /api/status` endpoint returning process uptime and DB-connection status would be a reasonable, low-effort near-term addition — see [Future Improvements](#future-improvements).
 
-```bash
-cp .env.example .env
-# edit values, then restart
-```
+## Future Improvements
 
----
+📋 **Planned / recommended next steps**, inferred from the documented gaps above (not a stated roadmap — the source provides none for the backend specifically):
 
-## API Reference
+- [ ] Publish full API documentation (OpenAPI/Swagger) covering the complete route set beyond the 5 confirmed endpoints.
+- [ ] Document Mongoose schemas and their actual relationships.
+- [ ] Add structured logging (Winston/Pino) with log levels and a shipping destination.
+- [ ] Add a `/health` endpoint and basic process/DB-connection monitoring.
+- [ ] Document rate-limit thresholds and confirm route coverage.
+- [ ] Add a Redis-backed Socket.IO adapter before scaling beyond a single instance.
+- [ ] Add automated tests (unit + integration) and a CI pipeline.
+- [ ] Resolve the token-storage documentation mismatch with the frontend repository (HttpOnly cookie vs. `sessionStorage`).
+- [ ] Document the validation library and strategy in use.
+- [ ] Define and document the error-response contract.
 
-All routes are mounted under `/api` (see `app.use('/api', routes)` in `app.ts`) and pass through a lightweight auth middleware that reads a `user-id` header (defaults to `"system"`) — there is no token verification at this layer yet.
+## Contributing Guide
 
-### Workflows
+⚠️ **Not documented for this repository specifically** — the frontend repo documents a standard fork → branch → implement → PR flow; apply the same convention here until a backend-specific contributing guide exists:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/workflows` | List workflows. Query params: `isActive`, `tags` (comma-separated), `createdBy` |
-| GET | `/api/workflows/:id` | Get one workflow |
-| POST | `/api/workflows` | Create a workflow (`createdBy` is set from the `user-id` header) |
-| PUT | `/api/workflows/:id` | Update a workflow — **blocked** (throws) if the workflow has any run in `idle`, `running`, or `waiting_approval` state |
-| DELETE | `/api/workflows/:id` | Soft-delete (deactivate) if it has historical runs; hard-delete otherwise |
-| POST | `/api/workflows/:id/execute` | Create and enqueue a new run. Body: `{ context: object, idempotencyKey?: string }` |
-| GET | `/api/workflows/:id/stats` | Aggregated run statistics for the workflow |
-
-### Runs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/runs` | List runs. Query params: `workflowId`, `status`, `limit`, `offset` |
-| GET | `/api/runs/:id` | Get one run |
-| POST | `/api/runs/:id/cancel` | Mark a non-terminal run as `failed` with `errorMessage: "Cancelled by user"` |
-
-### Approvals
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/approvals/pending` | List runs currently in `waiting_approval`, capped at 50, oldest first |
-| POST | `/api/runs/:id/approve` | Body: `{ approved: boolean }`. Approving executes the pending tool and resumes the run; rejecting sets status to `rejected` |
-
-### Settings
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/settings/ai-mode` | Current mode + label/description |
-| POST | `/api/settings/ai-mode` | Body: `{ mode: 'mock' \| 'real' }`. Changes the **process-wide, in-memory** mode (see [Known Limitations](#known-limitations)) |
-| GET | `/api/settings/ai-status` | Mode + whether an API key is configured + model name |
-
-### Health
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/health` | Top-level health check (Mongo, Redis, AI mode, memory usage) |
-| GET | `/api/health` | Minimal `{ status: "ok" }` check defined inside `routes.ts` — distinct from, and less detailed than, the `/health` route in `app.ts` |
-
----
-
-## Core Systems
-
-### The Orchestrator (`core/StateMachine.orchestrator.ts`)
-
-`Orchestrator.process(runId)` is the entry point called by the worker for every job. On each invocation it:
-
-1. Loads the run; returns immediately if it's already `completed`, `failed`, or `rejected` (idempotent no-op on terminal states).
-2. If `waiting_approval`, sends a Slack notification (if configured) and returns — no state change happens until a human calls the approve endpoint.
-3. Otherwise enters a bounded loop (`MAX_LOOP_ITERATIONS = 50`) that:
-   - marks the run `completed` once `currentStepIndex` reaches the end of `steps`;
-   - transitions to `waiting_approval` if the current step needs approval;
-   - advances past already-executed steps;
-   - retries failed steps up to `MAX_RETRIES = 3` with exponential backoff (`RETRY_BACKOFF_BASE_MS = 5000`, capped at 30s), scheduled back onto the BullMQ queue rather than looped in-process;
-   - for a fresh pending step, asks `callClaude()` for the next tool/arguments, appends a new step, executes the tool, and re-enqueues a `continue-run` job.
-
-The loop guard exists specifically to stop a malformed or cyclic workflow definition from spinning the worker forever; hitting it marks the run `failed` with an explicit `errorMessage`.
-
-```typescript
-// Excerpt — idempotency + approval gate, from StateMachine.orchestrator.ts
-if (
-  run.status === RunStatus.COMPLETED ||
-  run.status === RunStatus.FAILED ||
-  run.status === RunStatus.REJECTED
-) {
-  return; // terminal — nothing to do
-}
-
-if (run.status === RunStatus.WAITING_APPROVAL) {
-  await this.notifyApproval(run, correlationId);
-  return; // wait for a human decision via the approve endpoint
-}
-```
-
-**What "tool execution" actually does today:** `executeTool()` does not call any real external service (no Gmail/Calendar/Jira integration is wired up). It waits a randomized 200–800ms and returns a mock response object per tool name. This is worth knowing before treating the `send_email` / `create_calendar_event` / `create_jira_ticket` tools as production-ready integrations.
-
-### Two independent AI-mock implementations
-
-There are currently **two separate places** that generate mock AI content:
-
-- `Orchestrator.getMockDecision()` — used by the orchestrator's own `callClaude()`, hard-codes a `send_email` decision with a Arabic-language welcome message.
-- `AIService` / `utils/aiMode.ts#generateMockContent()` — a more general per-tool mock generator, used by `AIService.generateDecision()` / `generateEmail()`, which is **not currently called from the orchestrator's execution path**.
-
-If you're extending the mock behavior, check both files — a change in one will not affect the other.
-
-### Environment validation (`config/schema.ts`)
-
-The schema does more than type-check — it encodes real operational constraints:
-
-```typescript
-REDIS_TLS: z
-  .enum(['true', 'false'])
-  .default('false')
-  .transform((v) => v === 'true'),
-```
-
-This exists because `z.coerce.boolean()` on an env string performs `Boolean(value)`, and in JavaScript `Boolean("false")` is `true` — a classic env-var footgun. Restricting the input to the literal strings `'true'`/`'false'` before transforming avoids it.
-
-```typescript
-.refine((data) => data.AI_MODE !== 'real' || !!data.ANTHROPIC_API_KEY, {
-  message: 'ANTHROPIC_API_KEY is required when AI_MODE=real',
-  path: ['ANTHROPIC_API_KEY'],
-});
-```
-
-This cross-field rule means you cannot start the process in real mode without a key — the failure happens at boot, not on the first API call.
-
-### Error handling (`utils/errorHandler.ts`)
-
-`AppError` carries a `statusCode` and an `isOperational` flag. The global `errorHandler` middleware maps a handful of known error shapes to specific status codes:
-
-| Condition | Status | 
-|---|---|
-| `AppError` instance | its own `statusCode` |
-| Mongoose `ValidationError` | 400 |
-| Mongoose `CastError` (bad ObjectId) | 400 |
-| Mongo duplicate key (`code: 11000`) | 409 |
-| Message contains `ECONNREFUSED` | 503 |
-| Message contains `BullMQ` or `Redis` | 503 |
-| Message contains `timeout` | 504 |
-| Anything else | 500 |
-
-Stack traces are only included in the response outside of production (`NODE_ENV !== 'production'`).
-
-### Logging (`utils/logger.ts`)
-
-Winston is configured with three transports: colorized console (JSON in production), `logs/error.log` (5MB × 5 files, `error` level only), and `logs/combined.log` (10MB × 10 files, all levels). A separate `httpLogger` records one line per request/response with status, method, URL, and duration. Both the console formatter and the generic `redactSensitiveData()` helper strip keys matching `password`, `token`, `secret`, `apiKey`, `authorization`, `cookie`, `session`, `creditCard`, `cvv`, `ssn` before logging.
-
-### Graceful shutdown (`app.ts`)
-
-On `SIGTERM`/`SIGINT`/`SIGHUP`, the process: stops accepting new HTTP connections → closes the Mongo connection → closes the Redis client → calls `RunWorker.shutdown()`, which pauses the worker and polls for active BullMQ jobs to finish (up to 30s) before closing it → exits. A separate 30s hard-timeout timer forces `process.exit(1)` if the graceful path hangs.
-
----
-
-## Known Limitations
-
-Documented here deliberately, instead of glossed over, because they matter if you're deciding whether to build on top of this as-is:
-
-- **AI mode is process-global, in-memory state.** `POST /api/settings/ai-mode` mutates a module-level variable in `utils/aiMode.ts`. It is not persisted, not per-user, and will reset on restart or diverge across multiple worker/API instances if you scale horizontally.
-- **No test suite is wired up.** `vitest` is a devDependency and `@types/jest` is also present, but `package.json` has no `test` script and no test files were provided. Treat any "80% coverage" claim for this codebase as aspirational, not current.
-- **No authentication or authorization.** The `user-id` header is trusted as-is; there's no JWT verification, no session handling, and no rate limiting middleware currently mounted in `app.ts` despite `RATE_LIMIT_*` variables existing in `.env.example`.
-- **Tool execution is mocked.** `send_email`, `create_calendar_event`, and `create_jira_ticket` do not call Gmail/Calendar/Jira — they return synthetic success payloads after a short delay.
-- **Duplicate/dead code:** `api/controllers/AISettings.ts` duplicates `settings.controller.ts` and is not imported by `routes.ts`. Two independent mock-AI-content code paths exist (see [Core Systems](#core-systems)).
-- **Dependency version mismatch:** the root `package.json` lists `zod: ^3.23.8` in devDependencies, while the backend's actual runtime dependency (used by `config/schema.ts`) is `zod: ^4.4.3`. Confirm which one resolves in your environment before relying on Zod v4-only APIs.
-- **`/health` and `/api/health` are two different endpoints** with different response shapes — the former (in `app.ts`) is the detailed one; the latter (in `routes.ts`) just returns `{ status: "ok" }`.
-
----
-
-## Troubleshooting
-
-| Problem | Likely Cause | Solution |
-|---|---|---|
-| `Invalid environment configuration. The process will not start.` | A required env var is missing or malformed | Read the printed Zod issue list — it names the exact field and rule that failed |
-| `MONGO_URI must start with mongodb:// or mongodb+srv://` | Malformed connection string | Fix `MONGO_URI` in `.env` |
-| `ANTHROPIC_API_KEY is required when AI_MODE=real` | Real mode requested without a key | Set the key, or set `AI_MODE=mock` |
-| `Redis not initialized — call initializeRedis() during app bootstrap first` | Something called `getRedisClient()` before `initializeRedis()` ran | Should not happen via the normal `startServer()` path; check for out-of-order imports |
-| Approve/reject returns `Run is not waiting for approval` | The run already moved past that step, or was never paused | Re-fetch run status via `GET /api/runs/:id` before acting on stale UI state |
-| Workflow update throws `Cannot update workflow with N pending runs` | Update blocked by design while runs are in flight | Wait for runs to finish, or create a new workflow instead of mutating this one |
-
----
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feature/your-feature`.
+3. Implement the change, following the existing layered pattern (routes → middleware → controllers → services → models) — business logic belongs in services, not controllers.
+4. Add tests if a test suite exists in the repository (none is confirmed as of this writing).
+5. Open a PR describing the change and, if it touches the API surface, which endpoints are affected.
 
 ## License
 
-MIT
+MIT — see `LICENSE` for full terms.
+
+## Author & Contact
+
+**Mohammed Qannan**
+Full-Stack Developer — Node.js/Express and MongoDB on the backend, Next.js/React/TypeScript on the frontend, with a layered-architecture discipline applied on both sides.
+
+**Project links**
+- Backend repository: https://github.com/mohammed-dev-stack/mansati-backend
+- Frontend repository: https://github.com/mohammed-dev-stack/mansati-frontend

@@ -16,8 +16,6 @@ import { Spinner } from '../atoms/Spinner';
 import { SearchBar } from '../molecules/SearchBar';
 import { KnowledgeBaseCard } from '../molecules/KnowledgeBaseCard';
 import { Modal } from '../organisms/Modal';
-import { Toaster } from '../atoms/Toaster';
-
 /**
  * خصائص مكون صفحة قواعد المعرفة.
  */
@@ -586,10 +584,7 @@ export const KnowledgeBasePage = memo(
                 </Button>
               </div>
             </div>
-          </Modal>
-
-          <Toaster position="top-right" />
-        </div>
+          </Modal></div>
       );
     }
   )

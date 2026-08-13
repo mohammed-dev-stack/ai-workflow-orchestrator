@@ -14,8 +14,6 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { useAuthStore } from '../../stores/auth.store';
 import { Button } from '../atoms/Button';
 import { Spinner } from '../atoms/Spinner';
-import { Toaster } from '../atoms/Toaster';
-
 export type TimeRange = '7d' | '30d' | '90d' | 'custom';
 
 export interface AnalyticsPageProps {
@@ -502,10 +500,7 @@ export const AnalyticsPage = memo(
           ) : (
             <p className="text-sm text-gray-400 dark:text-gray-500">لا توجد بيانات</p>
           )}
-        </div>
-
-        <Toaster position="top-right" />
-      </div>
+        </div></div>
     );
   })
 );

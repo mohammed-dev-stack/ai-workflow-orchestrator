@@ -17,7 +17,6 @@ import { ChatWindow } from '../organisms/ChatWindow';
 import { Button } from '../atoms/Button';
 import { Spinner } from '../atoms/Spinner';
 import { SearchBar } from '../molecules/SearchBar';
-import { Toaster } from '../atoms/Toaster';
 import type { ListConversationsParams } from '../../types/api.types';
 
 // ============================================================
@@ -420,10 +419,7 @@ export const ChatPage = memo(
               </div>
             )}
           </div>
-        </div>
-
-        <Toaster position="top-right" />
-      </div>
+        </div></div>
     );
   })
 );

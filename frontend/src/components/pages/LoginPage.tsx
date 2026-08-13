@@ -6,8 +6,6 @@ import { useAuthStore } from '../../stores/auth.store';
 import { Input } from '../atoms/Input';
 import { Button } from '../atoms/Button';
 import { Spinner } from '../atoms/Spinner';
-import { Toaster } from '../atoms/Toaster';
-
 /**
  * خصائص مكون صفحة تسجيل الدخول.
  * [مُتحقَّق منطقياً بتتبع كامل] — جميع الخصائص المطلوبة مع وثائق JSDoc.
@@ -228,11 +226,7 @@ export const LoginPage = memo(
                   <p className="mt-1">جميع الحقوق محفوظة</p>
                 </div>
               </form>
-            </div>
-
-            {/* Toaster للإشعارات العامة */}
-            <Toaster position="bottom-center" />
-          </div>
+            </div></div>
         </div>
       );
     }

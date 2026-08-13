@@ -1,190 +1,211 @@
-// المسار: backend/src/app.ts
+// ============================================================
+// backend/src/app.ts
+// ============================================================
+// خادم Express — يُهيئ التطبيق بالكامل مع جميع الـ Middleware والمسارات.
+// ✅ تم إعادة هيكلته لاستخدام PostgreSQL + Prisma بدلاً من MongoDB.
+// ✅ تم تبني المصدر الوحيد (SSoT) للإعدادات من config/index.ts.
+// ✅ تم فصل منطق التشغيل (server.listen) عن تهيئة التطبيق (app) لتسهيل الاختبار.
+// ============================================================
 
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import { createServer } from 'http';
-import routes from './api/routes';
-import { errorHandler } from './utils/errorHandler';
-import logger, { createRequestLogger } from './utils/logger';
-import { connectDB, initializeRedis, getRedisClient } from './config';
-import { RunWorker } from './workers/run.worker';
-import { getAIMode, getModeLabel } from './utils/aiMode';
-import { env } from './config/env';
-// ============================================
-// ENVIRONMENT CONFIGURATION
-// ============================================
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import { createServer, Server } from 'http';
 
-dotenv.config();
+// ============================================================
+// استيرادات المشروع الداخلية
+// ============================================================
 
-const isProduction = process.env.// ============================================
-NODE_ENV === 'production';
+// المصدر الوحيد للإعدادات (SSoT)
+import { config } from './config/index.js';
 
-// EXPRESS APPLICATION INITIALIZATION
-// ============================================
+// أدوات المراقبة والتسجيل
+import { logger } from './observability/logger.js';
+import { getCurrentCorrelationId } from './middlewares/correlation.middleware.js';
+import { correlationMiddleware } from './middlewares/correlation.middleware.js';
+import { loggingMiddleware } from './middlewares/logging.middleware.js';
+
+// معالجات الأخطاء والمصادقة
+import { errorHandler, catchAllErrorHandler } from './middlewares/errorHandler.middleware.js';
+import { authenticate } from './middlewares/auth.middleware.js';
+
+// عميل Prisma (الاتصال بقاعدة البيانات PostgreSQL)
+import { prisma } from './models/prisma/client.js';
+
+// عميل Redis (لـ BullMQ والتخزين المؤقت)
+import { getRedisClient, initializeRedis } from './config/redis.config.js';
+
+// المسارات (Routes)
+import conversationRoutes from './routes/conversation.routes.js';
+import documentRoutes from './routes/document.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import knowledgeBaseRoutes from './routes/knowledgeBase.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
+
+// معالج BullMQ Worker (للمهام الخلفية)
+import { RunWorker } from './workers/run.worker.js';
+
+// ============================================================
+// إنشاء تطبيق Express
+// ============================================================
 
 const app: Application = express();
-const PORT = parseInt(process.env.PORT || '5000', 10);
 
-// ============================================
-// SECURITY MIDDLEWARES
-// ============================================
+// ============================================================
+// الـ Middleware الأساسية (الأمان، الضغط، التحليل)
+// ============================================================
 
-// Helmet - Security headers
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-      },
+/**
+ * Helmet – إضافة رؤوس أمان HTTP
+ * - crossOriginResourcePolicy: تسمح بتحميل الموارد عبر النطاقات (ضروري للـ API)
+ * - Content-Security-Policy: تقييد مصادر تحميل النصوص والصور
+ */
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
+      imgSrc: ["'self'", "data:"],
     },
-    crossOriginEmbedderPolicy: true,
-    crossOriginOpenerPolicy: true,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-    dnsPrefetchControl: true,
-    frameguard: { action: 'deny' },
-    hidePoweredBy: true,
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
-    ieNoOpen: true,
-    noSniff: true,
-    originAgentCluster: true,
-    permittedCrossDomainPolicies: true,
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-    xssFilter: true,
-  })
-);
-
-// CORS - Cross-Origin Resource Sharing
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim());
-
-const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins.includes(origin) || !isProduction) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
   },
+}));
+
+/**
+ * CORS – السماح للواجهة الأمامية بالاتصال بالخادم
+ * - origin: من الإعدادات (يدعم النطاقات المتعددة)
+ * - credentials: true للسماح بإرسال التوكن عبر الـ cookies
+ * - methods: جميع الطرق الأساسية
+ * - allowedHeaders: الرؤوس المصرح بها (بما فيها x-correlation-id و x-tenant-id)
+ * - exposedHeaders: الرؤوس المكشوفة للواجهة الأمامية (للـ rate limiting)
+ */
+app.use(cors({
+  origin: config.server.corsOrigin,
   credentials: true,
-  optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'user-id', 'X-Request-ID', 'X-Correlation-ID'],
-  exposedHeaders: ['X-Request-ID', 'X-Correlation-ID'],
-  maxAge: 86400,
-};
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-tenant-id'],
+  exposedHeaders: ['x-correlation-id', 'x-rate-limit-limit', 'x-rate-limit-remaining'],
+}));
 
-app.use(cors(corsOptions));
+/**
+ * Compression – ضغط الاستجابات (Gzip/Brotli)
+ * يقلل حجم البيانات المنقولة ويحسن الأداء
+ */
+app.use(compression());
 
-// Compression - Response compression
-app.use(
-  compression({
-    level: 6,
-    threshold: 1024,
-    filter: (req: Request, res: Response): boolean => {
-      if (req.headers['x-no-compression']) {
-        return false;
-      }
-      return compression.filter(req, res);
-    },
-  })
-);
+/**
+ * تحليل جسم الطلب (Body Parser)
+ * - JSON: حد أقصى 1 ميجابايت لمنع هجمات DoS
+ * - URL-encoded: دعم النماذج التقليدية
+ */
+const MAX_PAYLOAD_SIZE = 1024 * 1024; // 1 MB
+app.use(express.json({ limit: MAX_PAYLOAD_SIZE }));
+app.use(express.urlencoded({ extended: true, limit: MAX_PAYLOAD_SIZE }));
 
-// ============================================
-// BODY PARSING MIDDLEWARES
-// ============================================
+/**
+ * Cookie Parser – تحليل الـ cookies وإتاحتها في req.cookies
+ * تستخدمه بعض استراتيجيات المصادقة (مثل JWT في cookies)
+ */
+app.use(cookieParser());
 
-app.use(
-  express.json({
-    limit: '10mb',
-    verify: (req: Request, res: Response, buf: Buffer): void => {
-      try {
-        JSON.parse(buf.toString());
-      } catch {
-        res.status(400).json({
-          success: false,
-          message: 'Invalid JSON payload',
-        });
-      }
-    },
-  })
-);
+// ============================================================
+// التتبُّع والتسجيل (Correlation & Logging)
+// ============================================================
 
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+/**
+ * Correlation Middleware – إضافة معرف تتبع فريد لكل طلب
+ * يُستخدم في التسجيل لتتبع الطلبات عبر الخدمات المختلفة
+ */
+app.use(correlationMiddleware);
 
-// ============================================
-// REQUEST LOGGING & TRACING
-// ============================================
+/**
+ * Logging Middleware – تسجيل الطلبات والاستجابات
+ * - في بيئة التطوير: تسجيل جسم الطلب والاستجابة بالكامل
+ * - استثناء مسارات الصحة (لتجنب تلويث السجلات)
+ */
+app.use(loggingMiddleware({
+  logRequestBody: config.env.isDevelopment,
+  logResponseBody: config.env.isDevelopment,
+  excludePaths: ['/health', '/liveness', '/readiness', '/startup', '/metrics'],
+}));
 
-app.use((req: Request, res: Response, next: NextFunction): void => {
+// ============================================================
+// تحديد المعدل (Rate Limiter) — حماية من هجمات DoS
+// ============================================================
+
+// يمكن تفعيل الـ Redis-backed limiter لاحقاً، حالياً نستخدم in-memory
+const rateLimitWindowMs = config.rateLimit?.windowMs || 60000; // 60 ثانية
+const rateLimitMax = config.rateLimit?.maxRequests || 100; // 100 طلب لكل نافذة
+const rateLimitMessage = 'تم تجاوز حد الطلبات المسموح به. يرجى المحاولة بعد قليل.';
+
+app.use(rateLimit({
+  windowMs: rateLimitWindowMs,
+  max: rateLimitMax,
+  message: rateLimitMessage,
+  keyGenerator: (req) => {
+    const correlationId = getCurrentCorrelationId() || 'no-correlation-id';
+    const clientIp = req.ip ||
+                     req.headers['x-forwarded-for']?.toString().split(',')[0] ||
+                     req.socket.remoteAddress ||
+                     '0.0.0.0';
+    return `${clientIp}-${correlationId}`;
+  },
+  skip: (req) => req.path.startsWith('/health') || req.path.startsWith('/webhook'),
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
+// ============================================================
+// المسارات العامة (بدون مصادقة)
+// ============================================================
+
+/**
+ * GET /health
+ * فحص صحة الخادم (يُستخدم بواسطة أدوات المراقبة)
+ * يعرض حالة PostgreSQL (Prisma) و Redis و AI Mode
+ */
+app.get('/health', async (req: Request, res: Response) => {
+  const correlationId = getCurrentCorrelationId() || 'no-correlation-id';
   const startTime = Date.now();
-  const correlationId = req.headers['x-correlation-id'] as string || req.headers['x-request-id'] as string;
-  const requestId = correlationId || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-  // Add request ID to response headers
-  res.setHeader('X-Request-ID', requestId);
-
-  // Store in request object for use in other middleware
-  (req as Request & { requestId: string }).requestId = requestId;
-
-  // Create request-scoped logger
-  const reqLogger = createRequestLogger(req);
-
-  // Log request
-  reqLogger.info(`➡️ ${req.method} ${req.path}`, {
-    query: req.query,
-    body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? req.body : undefined,
-  });
-
-  // Log response
-  res.on('finish', (): void => {
-    const duration = Date.now() - startTime;
-    const statusIcon = res.statusCode >= 500 ? '🔴' : res.statusCode >= 400 ? '🟡' : '🟢';
-    reqLogger.info(`${statusIcon} ${req.method} ${req.path} ${res.statusCode} ${duration}ms`, {
-      statusCode: res.statusCode,
-      duration,
-    });
-  });
-
-  next();
-});
-
-// ============================================
-// API ROUTES
-// ============================================
-
-app.use('/api', routes);
-
-// ============================================
-// HEALTH CHECK ENDPOINT
-// ============================================
-
-app.get('/health', async (req: Request, res: Response): Promise<void> => {
-  const requestId = (req as Request & { requestId: string }).requestId;
 
   try {
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-
-    let redisStatus = 'disconnected';
+    // فحص اتصال Prisma (PostgreSQL)
+    let dbStatus = 'disconnected';
+    let dbLatency = 0;
     try {
-      const client = getRedisClient();
-      redisStatus = client ? 'connected' : 'disconnected';
-    } catch {
-      redisStatus = 'disconnected';
+      const dbStart = Date.now();
+      await prisma.$queryRaw`SELECT 1 as connected`;
+      dbLatency = Date.now() - dbStart;
+      dbStatus = 'connected';
+    } catch (error) {
+      dbStatus = 'error';
     }
 
-    const aiMode = getAIMode();
+    // فحص اتصال Redis
+    let redisStatus = 'disconnected';
+    let redisLatency = 0;
+    try {
+      const redis = getRedisClient();
+      if (redis) {
+        const redisStart = Date.now();
+        await redis.ping();
+        redisLatency = Date.now() - redisStart;
+        redisStatus = 'connected';
+      }
+    } catch (error) {
+      redisStatus = 'error';
+    }
+
+    // حالة الذكاء الاصطناعي
+    const aiMode = config.anthropic.apiKey && config.anthropic.apiKey !== 'dummy_key_for_development_please_replace_in_production'
+      ? 'real'
+      : 'mock';
+    const aiLabel = aiMode === 'real' ? '✅ Real (Claude)' : '🧪 Mock (Free - No Cost)';
 
     res.status(200).json({
       status: 'ok',
@@ -192,16 +213,19 @@ app.get('/health', async (req: Request, res: Response): Promise<void> => {
       uptime: process.uptime(),
       version: process.env.npm_package_version || '1.0.0',
       services: {
-        mongodb: {
+        database: {
+          type: 'PostgreSQL + pgvector',
           status: dbStatus,
+          latency: dbLatency,
         },
         redis: {
           status: redisStatus,
+          latency: redisLatency,
         },
         ai: {
           mode: aiMode,
-          label: getModeLabel(),
-          configured: !!process.env.ANTHROPIC_API_KEY,
+          label: aiLabel,
+          configured: !!config.anthropic.apiKey && config.anthropic.apiKey !== 'dummy_key_for_development_please_replace_in_production',
         },
       },
       memory: {
@@ -209,164 +233,279 @@ app.get('/health', async (req: Request, res: Response): Promise<void> => {
         heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
         heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
       },
-      requestId,
+      correlationId,
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown health check error';
-    logger.error(`Health check failed: ${message}`, {
-      requestId,
-      err: error,
-    });
+  } catch (error) {
+    logger.error('فشل فحص الصحة', { correlationId, error });
     res.status(500).json({
       status: 'error',
+      message: 'فشل فحص الصحة',
+      correlationId,
       timestamp: new Date().toISOString(),
-      message: 'Health check failed',
-      requestId,
     });
   }
 });
 
-// ============================================
-// NOT FOUND & ERROR HANDLING
-// ============================================
-
-app.use((req: Request, res: Response): void => {
-  const requestId = (req as Request & { requestId: string }).requestId;
-  logger.warn(`❓ 404: ${req.method} ${req.path}`, { requestId });
-  res.status(404).json({
-    success: false,
-    message: `Endpoint ${req.method} ${req.path} not found`,
-    requestId,
+/**
+ * GET /liveness
+ * فحص استمرارية التشغيل (يُستخدم بواسطة Kubernetes liveness probe)
+ * يجب أن يعيد 200 دائماً ما دام التطبيق قيد التشغيل
+ */
+app.get('/liveness', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'alive',
+    timestamp: new Date().toISOString(),
+    correlationId: getCurrentCorrelationId() || 'no-correlation-id',
+    uptime: process.uptime(),
   });
 });
 
-app.use(errorHandler);
-
-// ============================================
-// SERVER INITIALIZATION
-// ============================================
-
-let server: ReturnType<typeof createServer>;
-
-const shutdown = async (signal: string): Promise<void> => {
-  logger.info(`🛑 Received ${signal}, starting graceful shutdown...`);
-
-  // Stop accepting new connections
-  server.close(async (): Promise<void> => {
-    logger.info('🔒 HTTP server closed');
-
-    // Close MongoDB connection
-    try {
-      await mongoose.connection.close();
-      logger.info('🗄️ MongoDB connection closed');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown MongoDB close error';
-      logger.error(`❌ Error closing MongoDB: ${message}`, { err: error });
-    }
-
-    // Close Redis connection
-    try {
-      const redis = getRedisClient();
-      if (redis) {
-        await redis.quit();
-        logger.info('🔴 Redis connection closed');
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown Redis close error';
-      logger.error(`❌ Error closing Redis: ${message}`, { err: error });
-    }
-
-    // Close BullMQ Worker
-    try {
-      await RunWorker.shutdown();
-      logger.info('⚙️ BullMQ Worker closed');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown Worker close error';
-      logger.error(`❌ Error closing Worker: ${message}`, { err: error });
-    }
-
-    logger.info('✅ Graceful shutdown complete');
-    process.exit(0);
-  });
-
-  // Force shutdown after timeout
-  setTimeout((): void => {
-    logger.error('⏰ Force shutdown after timeout');
-    process.exit(1);
-  }, 30000);
-};
-
-const startServer = async (): Promise<void> => {
+/**
+ * GET /readiness
+ * فحص جاهزية الخادم (يُستخدم بواسطة Kubernetes readiness probe)
+ * يتحقق من اتصال قاعدة البيانات (Prisma) و Redis
+ */
+app.get('/readiness', async (req: Request, res: Response) => {
+  const correlationId = getCurrentCorrelationId() || 'no-correlation-id';
   try {
-    // Display startup banner
+    // اختبار Prisma
+    await prisma.$queryRaw`SELECT 1 as connected`;
+    // اختبار Redis
+    const redis = getRedisClient();
+    if (redis) {
+      await redis.ping();
+    }
+
+    res.status(200).json({
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      correlationId,
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'not_ready',
+      timestamp: new Date().toISOString(),
+      correlationId,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+  }
+});
+
+// ============================================================
+// المسارات المُستوردة (المحمية – تتطلب مصادقة)
+// ============================================================
+
+// تطبيق المصادقة (JWT) على جميع المسارات المحمية
+const requireAuth = authenticate;
+
+/**
+ * Webhook – مسار عام (بدون مصادقة) يستقبل رسائل واتساب
+ * يتحقق من التوقيع داخلياً لضمان الأمان
+ */
+app.use('/webhook', webhookRoutes);
+
+/**
+ * المصادقة – مسارات عامة (تسجيل الدخول، التسجيل، تجديد التوكن)
+ */
+app.use('/api/auth', authRoutes);
+
+/**
+ * المحادثات – تتطلب مصادقة وعزل المستأجرين
+ */
+app.use('/api/conversations', requireAuth, conversationRoutes);
+
+/**
+ * المستندات – تتطلب مصادقة وعزل المستأجرين
+ */
+app.use('/api/documents', requireAuth, documentRoutes);
+
+/**
+ * قواعد المعرفة – تتطلب مصادقة وعزل المستأجرين
+ */
+app.use('/api/knowledge-bases', requireAuth, knowledgeBaseRoutes);
+
+/**
+ * التحليلات – تتطلب مصادقة وعزل المستأجرين
+ */
+app.use('/api/analytics', requireAuth, analyticsRoutes);
+
+// ============================================================
+// معالج 404 (للمسارات غير المعروفة)
+// ============================================================
+
+app.use((req: Request, res: Response) => {
+  const correlationId = getCurrentCorrelationId() || 'no-correlation-id';
+  logger.warn('مسار غير موجود', {
+    correlationId,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+  });
+  res.status(404).json({
+    error: 'NOT_FOUND',
+    message: 'المسار غير موجود',
+    correlationId,
+    path: req.path,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============================================================
+// معالج الأخطاء العام
+// ============================================================
+
+app.use(errorHandler({
+  includeStackTrace: config.env.isDevelopment,
+  logStackTrace: true,
+}));
+
+app.use(catchAllErrorHandler);
+
+// ============================================================
+// تهيئة الخادم وتشغيله (منفصلة عن التطبيق)
+// ============================================================
+
+let server: Server;
+let isShuttingDown = false;
+
+/**
+ * دالة بدء تشغيل الخادم
+ * تقوم بـ:
+ * 1. الاتصال بـ PostgreSQL عبر Prisma
+ * 2. الاتصال بـ Redis
+ * 3. بدء BullMQ Worker
+ * 4. تشغيل خادم Express على المنفذ المحدد
+ */
+export async function startServer(): Promise<void> {
+  try {
+    // عرض لافتة البداية
     logger.info('🚀 ' + '='.repeat(60));
-    logger.info('  🤖 AI Workflow Orchestrator Server');
+    logger.info('  🤖 AI Knowledge Orchestrator Server');
     logger.info(`  📦 Version: ${process.env.npm_package_version || '1.0.0'}`);
-    logger.info(`  🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    logger.info(`  🤖 AI Mode: ${getModeLabel()}`);
-    logger.info(`  🔑 API Key: ${process.env.ANTHROPIC_API_KEY ? '✅ Configured' : '❌ Missing (Mock only)'}`);
+    logger.info(`  🌍 Environment: ${config.env.nodeEnv}`);
+    logger.info(`  🔑 API Key: ${config.anthropic.apiKey && config.anthropic.apiKey !== 'dummy_key_for_development_please_replace_in_production' ? '✅ Configured' : '❌ Missing (Mock only)'}`);
     logger.info('🚀 ' + '='.repeat(60));
 
-    // Connect to MongoDB
-    logger.info('🗄️ Connecting to MongoDB...');
-    await connectDB();
-    logger.info('✅ MongoDB connected successfully');
+    // 1. الاتصال بـ PostgreSQL عبر Prisma
+    logger.info('🗄️ Connecting to PostgreSQL via Prisma...');
+    await prisma.$connect();
+    // اختبار الاتصال
+    await prisma.$queryRaw`SELECT 1 as connected`;
+    logger.info('✅ PostgreSQL connected successfully');
 
-    // Connect to Redis
+    // 2. الاتصال بـ Redis
     logger.info('🔴 Connecting to Redis...');
     await initializeRedis();
     logger.info('✅ Redis connected successfully');
 
-    // Start BullMQ Worker
+    // 3. بدء BullMQ Worker (للمعالجة الخلفية)
     logger.info('⚙️ Starting BullMQ Worker...');
     await RunWorker.start();
     logger.info('✅ BullMQ Worker started');
 
-    // Start Express server
+    // 4. تشغيل خادم Express
+    const PORT = config.server.port || 3000;
     server = createServer(app);
-    server.listen(PORT, (): void => {
+    server.listen(PORT, () => {
       logger.info(`🌐 Server running on http://localhost:${PORT}`);
       logger.info(`📊 Health check: http://localhost:${PORT}/health`);
       logger.info(`📡 API endpoint: http://localhost:${PORT}/api`);
     });
 
-    // Register shutdown handlers
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGHUP', () => shutdown('SIGHUP'));
+    // تسجيل معالج الإغلاق الآمن
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
 
-    // Global error handlers
-    process.on('uncaughtException', (error: Error): void => {
-      logger.error(`💥 Uncaught Exception: ${error.message}`, {
-        stack: error.stack,
-      });
-      shutdown('uncaughtException');
+    // معالجة الأخطاء غير المتوقعة
+    process.on('uncaughtException', (error) => {
+      logger.error('💥 Uncaught Exception', { error: error.message, stack: error.stack });
+      gracefulShutdown('uncaughtException');
     });
 
-    process.on('unhandledRejection', (reason: unknown): void => {
-      const message = reason instanceof Error ? reason.message : String(reason);
-      logger.error(`💥 Unhandled Rejection: ${message}`, {
-        reason,
-      });
-      shutdown('unhandledRejection');
+    process.on('unhandledRejection', (reason) => {
+      logger.error('💥 Unhandled Rejection', { reason });
+      gracefulShutdown('unhandledRejection');
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown start error';
-    logger.error(`❌ Failed to start server: ${message}`, {
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+
+  } catch (error) {
+    logger.error('❌ Failed to start server', { error });
     process.exit(1);
   }
-};
+}
 
-// ============================================
-// START SERVER
-// ============================================
+/**
+ * دالة الإغلاق الآمن (Graceful Shutdown)
+ * تغلق:
+ * 1. خادم HTTP (بعد انتظار انتهاء الطلبات الحالية)
+ * 2. اتصال Prisma (PostgreSQL)
+ * 3. اتصال Redis
+ * 4. BullMQ Worker
+ */
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) {
+    logger.warn('⚠️ Shutdown already in progress, skipping duplicate signal');
+    return;
+  }
+  isShuttingDown = true;
 
-startServer();
+  logger.info(`🛑 Received ${signal}, starting graceful shutdown...`);
 
-// ============================================
-// EXPORTS
-// ============================================
+  // 1. إيقاف استقبال طلبات جديدة
+  if (server) {
+    server.close(async () => {
+      logger.info('🔒 HTTP server closed');
+      await closeConnections();
+    });
+  } else {
+    await closeConnections();
+  }
+
+  // مهلة قسريّة (Force timeout) لمنع التوقف للأبد
+  setTimeout(() => {
+    logger.error('⏰ Force shutdown after timeout');
+    process.exit(1);
+  }, 30000);
+}
+
+/**
+ * إغلاق جميع الاتصالات بشكل منظم
+ */
+async function closeConnections(): Promise<void> {
+  // 2. إغلاق اتصال Prisma (PostgreSQL)
+  try {
+    await prisma.$disconnect();
+    logger.info('🗄️ PostgreSQL connection closed');
+  } catch (error) {
+    logger.error('❌ Error closing PostgreSQL connection', { error });
+  }
+
+  // 3. إغلاق اتصال Redis
+  try {
+    const redis = getRedisClient();
+    if (redis) {
+      await redis.quit();
+      logger.info('🔴 Redis connection closed');
+    }
+  } catch (error) {
+    logger.error('❌ Error closing Redis connection', { error });
+  }
+
+  // 4. إغلاق BullMQ Worker
+  try {
+    await RunWorker.shutdown();
+    logger.info('⚙️ BullMQ Worker closed');
+  } catch (error) {
+    logger.error('❌ Error closing BullMQ Worker', { error });
+  }
+
+  logger.info('✅ Graceful shutdown complete');
+  process.exit(0);
+}
+
+// ============================================================
+// تصدير التطبيق (للاختبار أو للاستخدام الخارجي)
+// ============================================================
 
 export default app;

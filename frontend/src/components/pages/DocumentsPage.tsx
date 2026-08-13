@@ -11,7 +11,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDocuments } from '../../hooks/useDocuments';
 import { Spinner } from '../atoms/Spinner';
 import { Button } from '../atoms/Button';
-import { Toaster } from '../atoms/Toaster';
 import { useAuthStore } from '../../stores/auth.store';
 
 /**
@@ -244,10 +243,7 @@ export const DocumentsPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      <Toaster position="top-right" />
-    </div>
+      )}</div>
   );
 };
 

@@ -9,7 +9,6 @@ import React, { forwardRef, memo, useEffect, useCallback, useMemo, useState } fr
 import clsx from 'clsx';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { Dashboard } from '../organisms/Dashboard';
-import { Toaster } from '../atoms/Toaster';
 import { Button } from '../atoms/Button';
 import { Spinner } from '../atoms/Spinner';
 
@@ -192,9 +191,7 @@ export const DashboardPage = memo(
           isLoading={isLoading}
           error={error}
           onRetry={handleRetry}
-        />
-        <Toaster position="top-right" />
-      </div>
+        /></div>
     );
   })
 );

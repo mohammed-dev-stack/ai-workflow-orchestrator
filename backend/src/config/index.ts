@@ -2,48 +2,58 @@
 // backend/src/config/index.ts
 // ============================================================
 // المصدر الوحيد (SSoT) لجميع إعدادات التطبيق.
-// يجمع الإعدادات من env.schema.ts وملفات الإعدادات الأخرى (app.config.ts, ai.config.ts, db.config.ts)
-// ويكشفها ككائن واحد متجانس.
 // ============================================================
 
-import { envConfig, EnvConfig, loadEnvConfig, envSchema } from './env.schema';
-import { appConfig } from './app.config';
-import { aiConfig } from './ai.config';
-import { dbConfig } from './db.config';
+// ============================================================
+// 1. المصدر الأساسي: متغيرات البيئة
+// ============================================================
+export { envConfig, envSchema, loadEnvConfig } from './env.schema.js';
+export type { EnvConfig } from './env.schema.js';
+// ملاحظة: لا يوجد تصدير "env" في env.schema.js، لذلك تم حذف السطر export { env }.
 
-/**
- * كائن الإعدادات المُجمَّع.
- * يدمج جميع الإعدادات من المصادر المختلفة مع الحفاظ على الفصل المنطقي.
- * يوفر خصائص ملائمة للاستخدام في التطبيق (مثل isProduction، isDevelopment).
- *
- * يتبع مبدأ الفشل السريع (Fail-Fast): في حال عدم وجود إعداد أساسي، تُرمى استثناءات فورية.
- *
- * [مُتحقَّق منطقياً بتتبع كامل] — جميع الإعدادات مُعرَّفة، والأنواع مستنتجة بدقة.
- */
+// ============================================================
+// 2. إعدادات التطبيق والذكاء الاصطناعي وقاعدة البيانات
+// ============================================================
+export { appConfig } from './app.config.js';
+// تم حذف export type { AppConfig } من app.config.js لتجنب التعارض مع النوع المحلي.
+
+export { aiConfig } from './ai.config.js';
+export type { AIConfig } from './ai.config.js';
+
+export { dbConfig } from './db.config.js';
+export type { DBConfig } from './db.config.js';
+
+// ============================================================
+// 3. دوال Redis
+// ============================================================
+export {
+  initializeRedis,
+  getRedisClient,
+  disconnectRedis,
+  redisHealthCheck,
+} from './redis.config.js';
+
+// ============================================================
+// 4. كائن الإعدادات المُجمَّع
+// ============================================================
+import { envConfig } from './env.schema.js';
+import { appConfig } from './app.config.js';
+import { aiConfig } from './ai.config.js';
+import { dbConfig } from './db.config.js';
+
 export const config = {
-  // ============================================================
-  // البيئة العامة
-  // ============================================================
   env: {
     nodeEnv: envConfig.NODE_ENV,
     isProduction: envConfig.NODE_ENV === 'production',
     isDevelopment: envConfig.NODE_ENV === 'development',
     isTest: envConfig.NODE_ENV === 'test',
   },
-
-  // ============================================================
-  // الخادم (من appConfig)
-  // ============================================================
   server: {
     port: appConfig.server.port,
     host: appConfig.server.host,
     corsOrigin: appConfig.server.corsOrigin,
     requestTimeoutMs: appConfig.server.requestTimeoutMs,
   },
-
-  // ============================================================
-  // قاعدة البيانات (من dbConfig و envConfig)
-  // ============================================================
   database: {
     url: dbConfig.postgres.url,
     poolTimeout: dbConfig.postgres.connectionTimeoutMs,
@@ -54,29 +64,14 @@ export const config = {
     health: dbConfig.postgres.health,
     migrations: dbConfig.postgres.migrations,
   },
-
-  // ============================================================
-  // Redis (من dbConfig)
-  // ============================================================
   redis: {
-    url: dbConfig.redis.url,
-    connectionTimeoutMs: dbConfig.redis.connectionTimeoutMs,
-    retry: dbConfig.redis.retry,
-    queues: dbConfig.redis.queues,
-    cache: dbConfig.redis.cache,
+    url: envConfig.REDIS_URL,
+    retryDelay: envConfig.REDIS_RETRY_DELAY,
   },
-
-  // ============================================================
-  // JWT (من envConfig)
-  // ============================================================
   jwt: {
     secret: envConfig.JWT_SECRET,
     expiry: envConfig.JWT_EXPIRY,
   },
-
-  // ============================================================
-  // Anthropic Claude (من aiConfig و envConfig)
-  // ============================================================
   anthropic: {
     apiKey: aiConfig.anthropic.apiKey,
     model: aiConfig.anthropic.model,
@@ -86,10 +81,6 @@ export const config = {
     maxPromptLength: aiConfig.anthropic.maxPromptLength,
     timeoutMs: aiConfig.anthropic.timeoutMs,
   },
-
-  // ============================================================
-  // قاطع الدائرة وإعادة المحاولة (من envConfig)
-  // ============================================================
   circuitBreaker: {
     timeout: envConfig.CIRCUIT_BREAKER_TIMEOUT,
     errorThreshold: envConfig.CIRCUIT_BREAKER_ERROR_THRESHOLD,
@@ -101,166 +92,58 @@ export const config = {
     maxBackoffMs: aiConfig.retry.maxBackoffMs,
     retryableStatusCodes: aiConfig.retry.retryableStatusCodes,
   },
-
-  // ============================================================
-  // WhatsApp Cloud API (من envConfig)
-  // ============================================================
   whatsapp: {
     apiToken: envConfig.WHATSAPP_API_TOKEN,
     verifyToken: envConfig.WHATSAPP_VERIFY_TOKEN,
     apiVersion: envConfig.WHATSAPP_API_VERSION,
     phoneNumberId: envConfig.WHATSAPP_PHONE_NUMBER_ID,
   },
-
-  // ============================================================
-  // قابلية المراقبة (Observability) — من envConfig
-  // ============================================================
   observability: {
     otlpEndpoint: envConfig.OTEL_EXPORTER_OTLP_ENDPOINT,
     logLevel: envConfig.LOG_LEVEL,
   },
-
-  // ============================================================
-  // التكافؤ (Idempotency) — من envConfig
-  // ============================================================
   idempotency: {
     ttlSeconds: envConfig.IDEMPOTENCY_TTL,
   },
-
-  // ============================================================
-  // تحديد المعدل (Rate Limiting) — من envConfig و appConfig
-  // ============================================================
   rateLimit: {
     windowMs: appConfig.rateLimit.windowMs,
     maxRequests: appConfig.rateLimit.maxRequests,
     errorMessage: appConfig.rateLimit.errorMessage,
   },
-
-  // ============================================================
-  // الترقيم، الرفع، الأمان، قوائم الانتظار، التشفير — من appConfig
-  // ============================================================
   pagination: appConfig.pagination,
   upload: appConfig.upload,
   security: appConfig.security,
   queues: appConfig.queues,
   encryption: appConfig.encryption,
-
-  // ============================================================
-  // إعدادات الذكاء الاصطناعي الإضافية — من aiConfig
-  // ============================================================
   ai: {
     prompts: aiConfig.prompts,
     validation: aiConfig.validation,
     fallback: aiConfig.fallback,
     rateLimit: aiConfig.rateLimit,
   },
-
-  // ============================================================
-  // إعدادات التخزين المؤقت (من appConfig)
-  // ============================================================
   cache: appConfig.cache,
-
-  // ============================================================
-  // المصادقة (من appConfig)
-  // ============================================================
   auth: appConfig.auth,
-
-  // ============================================================
-  // التسجيل (من appConfig)
-  // ============================================================
   logging: appConfig.logging,
 } as const;
 
+/**
+ * النوع الرئيسي للإعدادات المُجمَّعة.
+ * هذا هو النوع الذي يجب استخدامه في بقية التطبيق.
+ */
 export type AppConfig = typeof config;
 
 /**
- * إعادة تصدير الأنواع والمخططات للاستخدام في باقي التطبيق.
- * هذا يسمح للخدمات بالاعتماد على الأنواع المستنتجة دون الحاجة لاستيراد env.schema مباشرة.
+ * دوال مساعدة للتحقق من الإعدادات.
  */
-export type { EnvConfig };
-export { loadEnvConfig, envSchema };
-
-/**
- * دالة مساعدة للتحقق من وجود إعداد معين (للحالات المشروطة).
- * تطبق الفشل السريع: إذا كان الإعداد مفقوداً وغير اختياري، تُرمي خطأً مصنفاً.
- * [مُتحقَّق منطقياً بتتبع كامل] — منطق بسيط ومباشر.
- */
-export function requireConfig<T>(
-  configValue: T | undefined,
-  configName: string
-): T {
+export function requireConfig<T>(configValue: T | undefined, configName: string): T {
   if (configValue === undefined || configValue === null) {
-    throw new Error(
-      `ConfigRequiredError: الإعداد المطلوب "${configName}" غير موجود. تأكد من تعيينه في البيئة.`
-    );
+    throw new Error(`ConfigRequiredError: الإعداد "${configName}" غير موجود.`);
   }
   return configValue;
 }
 
-/**
- * دالة مساعدة للتحقق من وجود إعداد اختياري مع قيمة افتراضية.
- * تطبق الأولويات: القيمة المقدمة > القيمة الافتراضية.
- * [مُتحقَّق منطقياً بتتبع كامل] — منطق بسيط ومباشر.
- */
-export function optionalConfig<T>(
-  configValue: T | undefined,
-  defaultValue: T
-): T {
-  return configValue !== undefined && configValue !== null
-    ? configValue
-    : defaultValue;
+export function optionalConfig<T>(configValue: T | undefined, defaultValue: T): T {
+  return configValue !== undefined && configValue !== null ? configValue : defaultValue;
 }
 
-/**
- * تصدير الكائن المُجمَّع بالكامل كافتراضي لسهولة الاستيراد.
- */
 export default config;
-
-/**
- * config/index.ts
- *
- * نقطة الدخول العامة الوحيدة لطبقة الإعدادات. بقية التطبيق يستورد من هنا
- * فقط، لا من الملفات الداخلية مباشرة.
- *
- * ثلاث تصحيحات عن نسخة سابقة من هذا الملف:
- *
- * 1) فصل تصدير الأنواع عن تصدير القيم (export type منفصل). النسخة
- *    السابقة كانت تصدّر Env, AIConfig, HealthCheckResult كقيم عادية رغم
- *    أنها أنواع فقط — وهذا فشل فعليًا عند التصريف (compile) تحت إعداد
- *    isolatedModules، وهو إعداد افتراضي أو مُوصى به في أغلب أدوات البناء
- *    الحديثة (Next.js, Vite, esbuild, swc). تم التحقق من هذا الخطأ عمليًا
- *    عبر tsc قبل هذا الإصلاح.
- *
- * 2) إزالة التصدير الافتراضي (default export) الذي كان يوفّر طريقة ثانية
- *    للوصول لنفس الدوال بجانب التصدير المُسمّى. وجود طريقتين متزامنتين
- *    يناقض مباشرة الهدف المُعلن في نفس الملف ("نمط واحد للوصول")، وهو
- *    بالضبط نوع الفجوة بين ما يقوله التعليق وما يفعله الكود.
- *
- * 3) إزالة تصدير envSchema من هذه الواجهة العامة. هذا الملف مخصص لبقية
- *    التطبيق (application layer)، لا لملفات الاختبار — ملفات الاختبار
- *    يمكنها استيراد envSchema مباشرة من './schema' عند الحاجة الفعلية،
- *    دون أن يُعرَّض هذا التفصيل الداخلي لكل مستهلك عادي للواجهة.
- */
- 
-export { env, buildEnvForTest } from './env';
-export type { Env } from './schema';
- 
-export { aiConfig, buildAIConfig, getSafeAIConfig } from './ai.config';
-export type { AIConfig } from './ai.config';
- 
-export {
-  connectDB,
-  disconnectDB,
-  isDBConnected,
-  dbHealthCheck,
-} from './database.config';
- 
-export {
-  initializeRedis,
-  getRedisClient,
-  disconnectRedis,
-  redisHealthCheck,
-} from './redis.config';
- 
-// تعريف واحد مشترك، يُستخدم من كل من Mongo وRedis health checks.
-export type { HealthCheckResult } from './types';

@@ -1,4 +1,13 @@
+// ============================================================
 // frontend/src/hooks/useWebSocket.ts
+// ============================================================
+// خطاف WebSocket مع دعم إعادة المحاولة، Ping، والإشعارات.
+// ✅ تم إضافة مفتاح تشغيل (Feature Toggle) عبر VITE_WS_ENABLED
+//    لمنع محاولة الاتصال بخادم غير موجود أثناء التطوير.
+// ✅ تم إصلاح نوع الإشعارات: استخدام variant بدلاً من type
+//    للتوافق مع نوع Toast الموحد في ui.store.ts.
+// ============================================================
+
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuthStore } from '../stores/auth.store';
 import { useConversation } from './useConversation';
@@ -8,10 +17,6 @@ import { useUIStore } from '../stores/ui.store';
 // 1. تعريف آمن لـ import.meta.env (لتجنب أخطاء TypeScript)
 // ============================================================
 
-/**
- * الحصول على قيمة متغير بيئة بطريقة آمنة.
- * إذا كان `import.meta.env` غير معرّف (في بيئات الاختبار)، نستخدم قيمة افتراضية.
- */
 function getEnv(key: string, defaultValue: string): string {
   try {
     // @ts-ignore - تجاوز TypeScript لأن `env` قد لا يكون معرّفاً في بعض البيئات
@@ -23,7 +28,7 @@ function getEnv(key: string, defaultValue: string): string {
 }
 
 // ============================================================
-// 2. تعريفات الأنواع (بقيت كما هي)
+// 2. تعريفات الأنواع
 // ============================================================
 
 export type WebSocketMessageType =
@@ -98,11 +103,12 @@ export interface UseWebSocketReturn {
 }
 
 // ============================================================
-// 3. الخطاف الرئيسي (مع إصلاح جميع المشكلات)
+// 3. الخطاف الرئيسي (مع مفتاح التشغيل)
 // ============================================================
 
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
-  // استخدام دالة آمنة للحصول على متغيرات البيئة
+  // ✅ قراءة متغير البيئة للتحكم في تفعيل WebSocket
+  const WS_ENABLED = getEnv('VITE_WS_ENABLED', 'false') === 'true';
   const WS_URL = getEnv('VITE_WS_URL', 'ws://localhost:3000/ws');
 
   const {
@@ -134,26 +140,21 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const { addNotification } = useUIStore();
 
   // ============================================================
-  // 4. التعامل مع useConversation — معالجة الدوال غير الموجودة
+  // 4. التعامل مع useConversation
   // ============================================================
 
-  // استيراد useConversation مع معالجة آمنة للدوال غير الموجودة
   let conversationHook;
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     conversationHook = useConversation();
   } catch {
-    // إذا فشل استيراد useConversation، نستخدم كائن فارغ
     conversationHook = {};
   }
 
- const {
-  fetchMessages = () => Promise.resolve(),
-} = conversationHook as any;
-
+  const { fetchMessages = () => Promise.resolve() } = conversationHook as any;
 
   // ============================================================
-  // 5. معالجة الرسائل الواردة (مع دالة isDev آمنة)
+  // 5. معالجة الرسائل الواردة (تم إصلاح type → variant)
   // ============================================================
 
   const isDev = getEnv('VITE_ENV', 'development') === 'development';
@@ -170,61 +171,57 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         switch (data.type) {
           case 'message.received': {
             const payload = data.payload as MessageReceivedPayload;
+            // ✅ تم تغيير type → variant
             addNotification({
-              type: 'info',
+              variant: 'info',
               message: `رسالة جديدة من ${payload.message.role === 'USER' ? 'عميل' : 'المساعد'}`,
               duration: 5000,
             });
-            // تحديث رسائل المحادثة إذا كانت المحادثة الحالية
             if (payload.conversationId) {
               fetchMessages(payload.conversationId).catch(() => {});
             }
             break;
           }
-
           case 'conversation.created': {
             const payload = data.payload as ConversationCreatedPayload;
+            // ✅ تم تغيير type → variant
             addNotification({
-              type: 'success',
+              variant: 'success',
               message: `محادثة جديدة مع ${payload.conversation.customerName || 'عميل'}`,
               duration: 5000,
             });
             break;
           }
-
           case 'document.processed': {
+            // ✅ تم تغيير type → variant
             addNotification({
-              type: 'success',
+              variant: 'success',
               message: 'اكتملت معالجة المستند بنجاح',
               duration: 5000,
             });
             break;
           }
-
           case 'document.failed': {
+            // ✅ تم تغيير type → variant
             addNotification({
-              type: 'error',
+              variant: 'error',
               message: `فشلت معالجة المستند: ${data.payload?.error || 'خطأ غير معروف'}`,
               duration: 8000,
             });
             break;
           }
-
           case 'ai.streaming': {
             const payload = data.payload as AIStreamingPayload;
             if (payload.conversationId && payload.done) {
-              // عند اكتمال التدفق، نقوم بتحديث الرسائل
               fetchMessages(payload.conversationId).catch(() => {});
             }
             break;
           }
-
           case 'error': {
             console.error('[WebSocket] خطأ من الخادم:', data.payload);
             setLastError(data.payload?.message || 'خطأ من الخادم');
             break;
           }
-
           default: {
             if (isDev) {
               console.warn('[WebSocket] نوع رسالة غير معروف:', (data as any).type);
@@ -239,16 +236,20 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   );
 
   // ============================================================
-  // 6. دوال إدارة الاتصال
+  // 6. دوال إدارة الاتصال (مع التحقق من WS_ENABLED)
   // ============================================================
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // ✅ إذا كان WebSocket معطلاً، لا تفعل شيئاً
+    if (!WS_ENABLED) {
+      if (isDev) {
+        console.log('[WebSocket] ⏸️ WebSocket معطل (VITE_WS_ENABLED=false)');
+      }
       return;
     }
-    if (wsRef.current?.readyState === WebSocket.CONNECTING) {
-      return;
-    }
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     setIsConnecting(true);
     setIsClosed(false);
@@ -360,10 +361,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     autoConnect,
     handleMessage,
     isDev,
+    WS_ENABLED,
   ]);
 
   // ============================================================
-  // 7. دوال عامة
+  // 7. دوال عامة (لا تتأثر بمفتاح التشغيل، فقط ترسل أوامر)
   // ============================================================
 
   const sendMessage = useCallback((type: WebSocketMessageType, payload: any): boolean => {
@@ -372,13 +374,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       console.warn('[WebSocket] لا يمكن إرسال الرسالة، الاتصال غير مفتوح');
       return false;
     }
-
     try {
-      const message: WebSocketMessage = {
-        type,
-        payload,
-        timestamp: new Date().toISOString(),
-      };
+      const message: WebSocketMessage = { type, payload, timestamp: new Date().toISOString() };
       ws.send(JSON.stringify(message));
       return true;
     } catch (error) {
@@ -434,11 +431,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   }, []);
 
   // ============================================================
-  // 8. دورة الحياة
+  // 8. دورة الحياة — تعتمد على WS_ENABLED
   // ============================================================
 
   useEffect(() => {
-    if (autoConnect && accessToken) {
+    // ✅ لن يحاول الاتصال إلا إذا كان WebSocket مفعلاً ولدينا توكن
+    if (autoConnect && accessToken && WS_ENABLED) {
       connect();
     } else if (!accessToken && wsRef.current) {
       disconnect();
@@ -447,7 +445,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     return () => {
       disconnect();
     };
-  }, [autoConnect, accessToken, connect, disconnect]);
+  }, [autoConnect, accessToken, WS_ENABLED, connect, disconnect]);
+
+  // ============================================================
+  // 9. الإرجاع
+  // ============================================================
 
   return {
     isConnected,

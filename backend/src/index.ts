@@ -1,14 +1,14 @@
 // ============================================================
 // backend/src/index.ts
 // ============================================================
-// نقطة الدخول الرئيسية لتطبيق الخادم.
-// تم إصلاح استيراد initializeTracer و shutdownTracer باستخدام التصدير المسمى.
+// نقطة الدخول الرئيسية لخادم HTTP + WebSocket.
+// ✅ تم إزالة جميع استدعاءات Workers (تم نقلها إلى worker.ts).
+// ✅ تم الحفاظ على التهيئة الأساسية (التشفير، التتبع، Redis، Rate Limiter).
 // ============================================================
 
 import { config } from './config/index.js';
 import { logger } from './observability/logger.js';
 import { getCurrentCorrelationId } from './middlewares/correlation.middleware.js';
-// ✅ التصدير المسمى متاح الآن في tracer.ts
 import { initializeTracer, shutdownTracer } from './observability/tracer.js';
 import { initializeEncryption } from './utils/encryption.js';
 import {
@@ -18,14 +18,12 @@ import {
   setQueuesInitialized,
 } from './observability/health/startup.js';
 import { server } from './server.js';
-import { documentWorker } from './queues/workers/document.worker.js';
-import { whatsappWorker } from './queues/workers/whatsapp.worker.js';
-import { analyticsWorker } from './queues/workers/analytics.worker.js';
-import deadLetterWorker from './queues/index.js';
 import { fileURLToPath } from 'url';
+import { initializeRedis } from './config/redis.config.js';
+import { initializeRateLimiter } from './middlewares/rateLimiter.middleware.js';
 
 // ============================================================
-// متغير لتخزين كائن الخادم (من `server.listen`) للإيقاف الآمن
+// متغير لتخزين كائن الخادم (للإيقاف الآمن)
 // ============================================================
 
 let httpServer: ReturnType<typeof server.listen> | null = null;
@@ -37,57 +35,26 @@ let httpServer: ReturnType<typeof server.listen> | null = null;
 function setupShutdownHandlers(): void {
   const shutdown = async (signal: string) => {
     const correlationId = getCurrentCorrelationId() || 'shutdown';
-    logger.info(`استلام إشارة ${signal}، بدء إيقاف التشغيل الآمن`, { correlationId });
+    logger.info(`🛑 استلام إشارة ${signal}، بدء إيقاف التشغيل الآمن`, { correlationId });
 
     try {
-      logger.debug('إيقاف عامل قائمة انتظار المستندات', { correlationId });
-      await documentWorker.close().catch((err: unknown) => {
-        logger.warn('فشل إيقاف عامل المستندات', {
-          correlationId,
-          error: err instanceof Error ? err.message : 'unknown',
-        });
-      });
-
-      logger.debug('إيقاف عامل قائمة انتظار WhatsApp', { correlationId });
-      await whatsappWorker.close().catch((err: unknown) => {
-        logger.warn('فشل إيقاف عامل WhatsApp', {
-          correlationId,
-          error: err instanceof Error ? err.message : 'unknown',
-        });
-      });
-
-      logger.debug('إيقاف عامل قائمة انتظار التحليلات', { correlationId });
-      await analyticsWorker.close().catch((err: unknown) => {
-        logger.warn('فشل إيقاف عامل التحليلات', {
-          correlationId,
-          error: err instanceof Error ? err.message : 'unknown',
-        });
-      });
-
-      logger.debug('إيقاف عامل DLQ', { correlationId });
-      await deadLetterWorker.close().catch((err: unknown) => {
-        logger.warn('فشل إيقاف عامل DLQ', {
-          correlationId,
-          error: err instanceof Error ? err.message : 'unknown',
-        });
-      });
-
-      await shutdownTracer().catch((err: unknown) => {
-        logger.warn('فشل إيقاف التتبع الموزع', {
-          correlationId,
-          error: err instanceof Error ? err.message : 'unknown',
-        });
-      });
-
       // إيقاف خادم HTTP
       if (httpServer) {
         await new Promise<void>((resolve) => {
           httpServer!.close(() => {
-            logger.debug('تم إيقاف خادم HTTP', { correlationId });
+            logger.debug('✅ تم إيقاف خادم HTTP', { correlationId });
             resolve();
           });
         });
       }
+
+      // إيقاف التتبع الموزع (Tracing)
+      await shutdownTracer().catch((err: unknown) => {
+        logger.warn('⚠️ فشل إيقاف التتبع الموزع', {
+          correlationId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      });
 
       logger.info('✅ إيقاف التشغيل الآمن اكتمل', { correlationId });
       process.exit(0);
@@ -125,13 +92,13 @@ function setupShutdownHandlers(): void {
 }
 
 // ============================================================
-// التهيئة الأساسية
+// التهيئة الأساسية (بدون Workers)
 // ============================================================
 
 async function initializeApplication(): Promise<void> {
   const correlationId = 'startup-init';
 
-  logger.info('🚀 بدء تهيئة التطبيق', {
+  logger.info('🚀 بدء تهيئة خادم HTTP', {
     correlationId,
     nodeVersion: process.version,
     env: config.env.nodeEnv,
@@ -139,18 +106,32 @@ async function initializeApplication(): Promise<void> {
   });
 
   try {
-    logger.debug('تهيئة التشفير', { correlationId });
+    // 1. التشفير
+    logger.debug('🔐 تهيئة التشفير', { correlationId });
     initializeEncryption();
 
-    logger.debug('تهيئة التتبع الموزع', { correlationId });
-    // ✅ initializeTracer متاحة كتصدير مسمى
+    // 2. التتبع الموزع
+    logger.debug('🔍 تهيئة التتبع الموزع', { correlationId });
     initializeTracer();
     setTracingInitialized(true);
+
+    // 3. Redis (مطلوب لـ Rate Limiter و BullMQ)
+    logger.debug('🔴 تهيئة Redis', { correlationId });
+    const redisClient = await initializeRedis();
+    initializeRateLimiter(redisClient);
+    logger.info('✅ تم تهيئة Redis و Rate Limiter', { correlationId });
+
+    // 4. حالة بدء التشغيل
+    logger.debug('📊 تهيئة حالة بدء التشغيل', { correlationId });
+    initializeStartup();
+    setQueuesInitialized(true);
+    markStartupComplete();
 
     logger.info('✅ اكتملت التهيئة الأساسية', {
       correlationId,
       tracingInitialized: true,
       encryptionInitialized: true,
+      redisInitialized: true,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'unknown';
@@ -173,18 +154,12 @@ async function startApplication(): Promise<void> {
   try {
     await initializeApplication();
 
-    logger.debug('تهيئة حالة بدء التشغيل', { correlationId });
-    initializeStartup();
-
-    setQueuesInitialized(true);
-    markStartupComplete();
-
-    // ✅ بدء تشغيل الخادم باستخدام `server.listen`
+    // بدء تشغيل الخادم
     const port = config.server.port;
-    logger.info('🚀 بدء تشغيل الخادم', { correlationId, port });
+    logger.info('🚀 بدء تشغيل خادم HTTP', { correlationId, port });
 
     httpServer = server.listen(port, () => {
-      logger.info('✅ اكتمل بدء تشغيل التطبيق', {
+      logger.info('✅ اكتمل بدء تشغيل الخادم', {
         correlationId,
         port,
         env: config.env.nodeEnv,
@@ -192,12 +167,13 @@ async function startApplication(): Promise<void> {
 
       console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║  ✅ WhatsApp AI Agent Platform - Backend Server            ║
+║  ✅ WhatsApp AI Agent Platform - HTTP Server               ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  🚀 Server running at:     http://localhost:${port}        ║
 ║  🌍 Environment:           ${config.env.nodeEnv.padEnd(30)}║
 ║  🔢 Process ID:            ${String(process.pid).padEnd(30)}║
 ║  ⏱️  Started at:            ${new Date().toISOString()} ║
+║  ⚙️  Workers:               Running separately             ║
 ╚══════════════════════════════════════════════════════════════╝
       `);
     });
@@ -215,7 +191,7 @@ async function startApplication(): Promise<void> {
 }
 
 // ============================================================
-// ✅ نقطة الدخول (ESM) — بدون require
+// نقطة الدخول (ESM)
 // ============================================================
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -241,4 +217,3 @@ export {
 
 export { server };
 export default startApplication;
-

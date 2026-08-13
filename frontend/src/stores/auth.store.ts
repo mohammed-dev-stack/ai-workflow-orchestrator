@@ -64,10 +64,14 @@ export const useAuthStore = create<AuthStore>()(
       // ============================================================
       // تسجيل الدخول
       // ============================================================
-      login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+      // ============================================================
+// frontend/src/stores/auth.store.ts (الدالة login المُصلحة)
+// ============================================================
+
+login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
   set({ isLoading: true, error: null });
   try {
-    const response = await authApi.login(credentials); // ← يحصل على AuthResponse المهيكل
+    const response = await authApi.login(credentials);
     set({
       user: response.user,
       isAuthenticated: true,
@@ -79,7 +83,12 @@ export const useAuthStore = create<AuthStore>()(
     });
     return response;
   } catch (error) {
-    // معالجة الخطأ
+    // ✅ الإصلاح الجذري: معالجة كاملة للخطأ وإعادة الرمي
+    const errorMessage = error instanceof Error ? error.message : 'فشل تسجيل الدخول';
+    // محاولة استخراج رسالة مفصلة من الـ API response إن وجدت
+    const detailedMessage = (error as any)?.response?.data?.message || errorMessage;
+    set({ error: detailedMessage, isLoading: false });
+    throw error; // <- هذه هي النقطة الأهم، تضمن عدم كسر الـ TypeScript
   }
 },
 

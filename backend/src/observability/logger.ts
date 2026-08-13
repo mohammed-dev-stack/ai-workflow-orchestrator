@@ -1,17 +1,39 @@
+// ============================================================
 // backend/src/observability/logger.ts
-import pino, { Logger as PinoLogger, LoggerOptions as PinoLoggerOptions, Level } from 'pino';
+// ============================================================
+// نظام التسجيل المتقدم (Pino + OpenTelemetry).
+// تم إصلاح التبعية الدائرية مع config/index.ts عن طريق استخدام envConfig مباشرة.
+// ============================================================
 
-const options: PinoLoggerOptions = {
-  level: 'info',
-};
+import pino, { Logger as PinoLogger, Level } from 'pino';
 import { randomUUID } from 'crypto';
-import { config } from '../config/index.js';
+import { trace } from '@opentelemetry/api';
+import { envConfig } from '../config/env.schema.js';
 import { getCurrentCorrelationId } from '../middlewares/correlation.middleware.js';
-import { trace, context } from '@opentelemetry/api';
+
+// ============================================================
+// 1. تحديد الإعدادات الأساسية
+// ============================================================
 
 /**
- * واجهة المُسجل المُصدَّر بتوقيع عام واحد.
+ * مستوى التسجيل من envConfig أو القيمة الافتراضية.
  */
+const LOG_LEVEL = envConfig?.LOG_LEVEL || 'info';
+
+/**
+ * بيئة التشغيل (development/production/test).
+ */
+const NODE_ENV = envConfig?.NODE_ENV || 'development';
+
+/**
+ * اسم الخدمة.
+ */
+const SERVICE_NAME = 'whatsapp-ai-agent';
+
+// ============================================================
+// 2. واجهة المُسجل المُوحَّدة (ILogger)
+// ============================================================
+
 export interface ILogger {
   info: (message: string, meta?: Record<string, unknown>) => void;
   warn: (message: string, meta?: Record<string, unknown>) => void;
@@ -28,93 +50,63 @@ export interface LoggerOptions {
   includeTimestamp?: boolean;
 }
 
-class LoggerSingleton {
-  private static instance: PinoLogger | null = null;
+// ============================================================
+// 3. إنشاء المُسجل الأساسي (Pino)
+// ============================================================
 
-  static getInstance(options: LoggerOptions = {}): PinoLogger {
-    if (!this.instance) {
-      this.instance = this.createLogger(options);
-    }
-    return this.instance;
-  }
-
-  private static createLogger(options: LoggerOptions): PinoLogger {
-    const {
-      level = config.observability.logLevel || 'info',
-      prettyPrint = config.env.isDevelopment,
-      serviceName = 'whatsapp-ai-agent',
-      includeTimestamp = true,
-    } = options;
-
-    const pinoOptions: PinoLoggerOptions = {
-  level,
-  name: serviceName,
+/**
+ * إعدادات Pino.
+ */
+const pinoOptions: pino.LoggerOptions = {
+  level: LOG_LEVEL,
+  name: SERVICE_NAME,
   formatters: {
     level: (label: string) => ({ level: label }),
-    ...(includeTimestamp && {
-      timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
-    }),
+    timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
     bindings: (bindings: Record<string, any>) => ({
       pid: bindings.pid,
       hostname: bindings.hostname,
-      service: serviceName,
-      env: config.env.nodeEnv,
+      service: SERVICE_NAME,
+      env: NODE_ENV,
     }),
     log: (obj) => ({
-      msg: obj.message,   // بديل عن messageKey
-      err: obj.error,     // بديل عن errorKey
+      msg: obj.message,
+      err: obj.error,
     }),
   },
-  ...(prettyPrint && {
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'SYS:standard',
-        ignore: 'pid,hostname',
-        singleLine: true,
-      },
-    },
-  }),
   base: {
-    service: serviceName,
-    env: config.env.nodeEnv,
+    service: SERVICE_NAME,
+    env: NODE_ENV,
   },
 };
 
-
-    const logger = pino(pinoOptions);
-
-    // تسجيل بدء التشغيل
-    logger.info({
-  msg: 'تم تهيئة المُسجل',
-  level,
-  prettyPrint,
-  serviceName,
-  env: config.env.nodeEnv,
-});
-
-
-    return logger;
-  }
-
-  static resetInstance(): void {
-    this.instance = null;
-  }
+/**
+ * إضافة التنسيق الجميل (pretty print) في بيئة التطوير.
+ */
+if (NODE_ENV === 'development') {
+  pinoOptions.transport = {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname',
+      singleLine: true,
+    },
+  };
 }
 
 /**
- * المُسجل الداخلي (Pino).
+ * إنشاء المُسجل الأساسي.
  */
-const pinoLogger = LoggerSingleton.getInstance();
+const pinoLogger: PinoLogger = pino(pinoOptions);
 
-/**
- * دالة مساعدة لإنشاء ILogger من PinoLogger.
- */
+// ============================================================
+// 4. ربط المُسجل بواجهة ILogger
+// ============================================================
+
+let currentLevel = pinoLogger.level;
+
 function wrapPinoLogger(pino: PinoLogger): ILogger {
-  // الحصول على مستوى التسجيل الحالي
-  let currentLevel = pino.level;
-
   return {
     info: (message: string, meta?: Record<string, unknown>) => {
       pino.info(meta ? { message, ...meta } : { message });
@@ -146,12 +138,18 @@ function wrapPinoLogger(pino: PinoLogger): ILogger {
   };
 }
 
+// ============================================================
+// 5. التصدير الرئيسي
+// ============================================================
+
 /**
  * المُسجل المُصدَّر (ILogger).
- * جميع الدوال لها توقيع عام واحد: (message: string, meta?: Record<string, unknown>) => void
  */
 export const logger = wrapPinoLogger(pinoLogger);
 
+/**
+ * إنشاء مُسجل فرعي (بمعرف تتبّع).
+ */
 export function createChildLogger(bindings: Record<string, any>): ILogger {
   const correlationId = getCurrentCorrelationId() || bindings.correlationId || randomUUID();
   const { correlationId: _, ...restBindings } = bindings;
@@ -161,6 +159,9 @@ export function createChildLogger(bindings: Record<string, any>): ILogger {
   });
 }
 
+/**
+ * تسجيل خطأ مع كامل التفاصيل.
+ */
 export function logError(
   message: string,
   error: Error,
@@ -176,6 +177,9 @@ export function logError(
   });
 }
 
+/**
+ * تسجيل خطأ تشغيلي (غير حرج).
+ */
 export function logOperationalError(
   message: string,
   error: Error | string,
@@ -192,6 +196,9 @@ export function logOperationalError(
   });
 }
 
+/**
+ * إنشاء مُسجل لعملية محددة (قياس المدة، النجاح، الفشل).
+ */
 export function createOperationLogger(
   operationName: string,
   context: Record<string, any> = {}
@@ -241,6 +248,9 @@ export function createOperationLogger(
   };
 }
 
+/**
+ * تسجيل مقياس رقمي (Metric).
+ */
 export function logMetric(
   metricName: string,
   value: number,
@@ -256,6 +266,9 @@ export function logMetric(
   });
 }
 
+/**
+ * تسجيل تتبّع (Trace) مع دعم OpenTelemetry.
+ */
 export function logTrace(
   traceName: string,
   data: Record<string, any> = {}
@@ -287,16 +300,29 @@ export function logTrace(
   });
 }
 
+/**
+ * الحصول على مستوى التسجيل الحالي.
+ */
 export function getLogLevel(): string {
   return logger.level;
 }
 
+/**
+ * تغيير مستوى التسجيل.
+ */
 export function setLogLevel(level: Level): void {
   logger.level = level;
   logger.info('تم تغيير مستوى التسجيل', { level });
 }
 
-export default logger;
+// ============================================================
+// 6. تصدير أنواع للاستخدام الخارجي
+// ============================================================
 
 export type { PinoLogger, Level };
 
+// ============================================================
+// 7. تصدير افتراضي
+// ============================================================
+
+export default logger;

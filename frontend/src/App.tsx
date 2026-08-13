@@ -2,8 +2,8 @@
 // frontend/src/App.tsx
 // ============================================================
 // المكوّن الرئيسي للتطبيق — يحدد المسارات، المصادقة، والتخزين المؤقت.
-// ✅ تم إضافة مسار ديناميكي للمحادثات: /chat/:conversationId
-// ✅ تم إضافة مسار عرض المستندات.
+// ✅ تم توصيل مكون Toaster بـ useUIStore لجلب الإشعارات وعرضها.
+// ✅ تم حذف جميع نسخ Toaster المتناثرة في الصفحات.
 // ============================================================
 
 import React, { Suspense, lazy, useEffect } from 'react';
@@ -11,6 +11,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useAuthStore } from './stores/auth.store';
+import { useUIStore } from './stores/ui.store';
 import { ErrorBoundary } from './components/atoms/ErrorBoundary';
 import { LoadingSpinner } from './components/atoms/Spinner';
 import { Toaster } from './components/atoms/Toaster';
@@ -84,7 +85,6 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* صفحة تسجيل الدخول (عامة) */}
       <Route
         path="/login"
         element={
@@ -94,7 +94,6 @@ function AppRoutes() {
         }
       />
 
-      {/* المسارات المحمية */}
       <Route
         element={
           <ProtectedRoute>
@@ -110,8 +109,6 @@ function AppRoutes() {
             </Suspense>
           }
         />
-
-        {/* قواعد المعرفة */}
         <Route
           path="knowledge-bases"
           element={
@@ -120,8 +117,6 @@ function AppRoutes() {
             </Suspense>
           }
         />
-
-        {/* ✅ مسار عرض المستندات */}
         <Route
           path="knowledge-bases/:id/documents"
           element={
@@ -130,8 +125,6 @@ function AppRoutes() {
             </Suspense>
           }
         />
-
-        {/* ✅ مسار المحادثات – مع دعم المعرف (conversationId) */}
         <Route
           path="chat"
           element={
@@ -140,7 +133,6 @@ function AppRoutes() {
             </Suspense>
           }
         />
-        {/* ✅ مسار ديناميكي للمحادثة المحددة */}
         <Route
           path="chat/:conversationId"
           element={
@@ -149,8 +141,6 @@ function AppRoutes() {
             </Suspense>
           }
         />
-
-        {/* التحليلات */}
         <Route
           path="analytics"
           element={
@@ -159,8 +149,6 @@ function AppRoutes() {
             </Suspense>
           }
         />
-
-        {/* أي مسار غير معروف → إعادة توجيه إلى الصفحة الرئيسية */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -168,10 +156,12 @@ function AppRoutes() {
 }
 
 // ============================================================
-// 5. المكوّن الرئيسي للتطبيق (App)
+// 5. المكوّن الرئيسي للتطبيق (مع Toaster موصول)
 // ============================================================
 
 export default function App() {
+  const { notifications, removeNotification } = useUIStore();
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
@@ -184,7 +174,15 @@ export default function App() {
 
           {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
 
-          <Toaster position="top-left" />
+          {/* ✅ النسخة الوحيدة من Toaster — موصولة بالـ Store */}
+          <Toaster
+            toasts={notifications}
+            onRemove={removeNotification}
+            position="top-right"
+            maxToasts={5}
+            showIcons={true}
+            defaultDuration={4000}
+          />
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

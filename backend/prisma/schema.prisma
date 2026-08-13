@@ -2,7 +2,8 @@
 // backend/prisma/schema.prisma
 // ============================================================
 // مخطط قاعدة البيانات (Prisma Schema)
-// تم إصلاح تعارض أسماء القيود والعلاقات المفقودة.
+// ✅ تم إصلاح تعارض الأدوار: تغيير MANAGER إلى AGENT 
+//   ليصبح (ADMIN | AGENT | VIEWER) متطابقاً مع auth.middleware.ts.
 // ============================================================
 
 generator client {
@@ -12,7 +13,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // تم حذف url - يُقرأ من prisma.config.ts
 }
 
 // ============================================================
@@ -20,7 +20,7 @@ datasource db {
 // ============================================================
 model Tenant {
   id               String    @id @default(uuid())
-  name             String    // تم إزالة @unique لمنع التعارض مع @@unique
+  name             String
   domain           String?   @unique
   adminEmail       String
   phoneNumber      String?
@@ -42,7 +42,6 @@ model Tenant {
   conversations    Conversation[]
   messages         Message[]
 
-  // ✅ تم الاحتفاظ بـ @@unique على name فقط
   @@unique([name])
   @@index([status])
   @@index([plan])
@@ -89,9 +88,10 @@ model User {
   @@map("users")
 }
 
+// ✅ تم إصلاح الـ Enum هنا ليتطابق مع الكود (AGENT بدلاً من MANAGER)
 enum UserRole {
   ADMIN
-  MANAGER
+  AGENT      // <-- تم التعديل من MANAGER إلى AGENT
   VIEWER
 }
 
@@ -253,7 +253,6 @@ model Message {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  // ✅ تم إضافة العلاقة العكسية مع Tenant
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 

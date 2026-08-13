@@ -6,7 +6,7 @@
 
 ![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express.js-5.x-000000?style=for-the-badge&logo=express&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-7.x-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.x-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Socket.io](https://img.shields.io/badge/Socket.io-4.x-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
@@ -48,7 +48,7 @@
 
 ## Overview
 
-✅ **Confirmed**: Mansati's backend is a Node.js/Express + MongoDB (via Mongoose) service that provides a REST API and a Socket.IO real-time channel to the companion [Next.js frontend](https://github.com/mohammed-dev-stack/mansati-frontend). It follows a layered/clean architecture: routes → middleware → controllers → services → data layer, with services as the only layer documented as touching the database.
+✅ **Confirmed**: Mansati's backend is a Node.js/Express + PostgreSQL (via Prisma) service that provides a REST API and a Socket.IO real-time channel to the companion [Next.js frontend](https://github.com/mohammed-dev-stack/mansati-frontend). It follows a layered/clean architecture: routes → middleware → controllers → services → data layer, with services as the only layer documented as touching the database.
 
 ## What This Is & Why It Exists
 
@@ -67,7 +67,7 @@ graph TD
     B --> C[Middleware - Auth & Security]
     C --> D[Controllers - Request handling]
     D --> E[Services - Business rules]
-    E --> F[(MongoDB via Mongoose)]
+    E --> F[(PostgreSQL via Prisma)]
     D --> G
     G --> F
 ```
@@ -80,7 +80,7 @@ graph TD
 | **Middleware** | Authentication/authorization checks, security headers, centralized error handling |
 | **Controllers** | Request/response handling — parse input, call services, shape the response |
 | **Services** | Business rules — the only layer documented as talking to the data layer |
-| **Models** | Mongoose schemas (⚠️ field-level schema not documented in source) |
+| **Prisma schema** | Table definitions and relations (⚠️ field-level schema not documented in source) |
 | **Socket Manager** | WebSocket event handling for chat/notifications, running alongside the controller layer |
 
 ---
@@ -119,7 +119,7 @@ sequenceDiagram
     participant Middleware as Auth Middleware
     participant Controller
     participant Service
-    participant DB as MongoDB
+    participant DB as PostgreSQL
 
     Client->>Route: HTTP request (+ JWT)
     Route->>Middleware: verify token / role
@@ -128,7 +128,7 @@ sequenceDiagram
     else valid token
         Middleware->>Controller: forward request
         Controller->>Service: execute business logic
-        Service->>DB: query/mutate via Mongoose
+        Service->>DB: query/mutate via Prisma
         DB-->>Service: result
         Service-->>Controller: processed data
         Controller-->>Client: JSON response
@@ -144,7 +144,7 @@ sequenceDiagram
     participant Client
     participant AuthCtrl as Auth Controller
     participant Service as Auth Service
-    participant DB as MongoDB
+    participant DB as PostgreSQL
 
     Client->>AuthCtrl: POST /api/auth/login (credentials)
     AuthCtrl->>Service: validate credentials
@@ -195,9 +195,9 @@ erDiagram
     USER ||--o{ NOTIFICATION : receives
 ```
 
-✅ **Confirmed**: MongoDB via Mongoose ODM.
+✅ **Confirmed**: PostgreSQL via Prisma ORM.
 
-⚠️ **Not documented — this diagram is a hypothesis, not a schema.** No `models/` file contents were provided, so collection names, field definitions, indexes, and actual relationships (e.g., is `follows` its own collection or an array on `User`? are reactions a subdocument on `Post` or their own collection?) are unverified. The entities and edges above are drawn from the frontend's *feature* list (users create posts, follow other users, send messages, react/comment on posts, receive notifications) — they describe the product's data shape, not the database's. Validate against `models/` before treating this as documentation.
+⚠️ **Not documented — this diagram is a hypothesis, not a schema.** No `prisma/schema.prisma` contents were provided, so table names, column definitions, indexes, and actual relations (e.g., is `follows` its own join table or a many-to-many relation field on `User`? are reactions their own table or a composite-keyed join table against `Post` and `User`?) are unverified. The entities and edges above are drawn from the frontend's *feature* list (users create posts, follow other users, send messages, react/comment on posts, receive notifications) — they describe the product's data shape, not the database's. Validate against `prisma/schema.prisma` before treating this as documentation.
 
 ---
 
@@ -209,17 +209,17 @@ erDiagram
 - Password hashing via Bcrypt.js — plaintext passwords never persisted.
 - Security headers via `Helmet.js`.
 - Rate limiting, described as DDoS/brute-force protection (see [Rate Limiting](#rate-limiting) for what's unconfirmed).
-- Data sanitization, described as NoSQL-injection protection.
+- Data sanitization, described as SQL-injection protection.
 - CORS configuration, managed in `config/`.
 - Centralized error handling, isolating internal error detail from clients.
 
-⚠️ **Not documented**: CSP policy specifics, dependency-audit/SCA tooling (e.g., `npm audit` in CI, Snyk), secrets-management approach beyond `.env`, or a documented threat model.
+⚠️ **Not documented**: CSP policy specifics, dependency-audit/SCA tooling (e.g., `npm audit` in CI, Snyk), secrets-management approach beyond `.env`, or a documented threat model. Note also that Prisma's query builder parameterizes queries by default, which is itself a meaningful SQL-injection mitigation — whether the documented "data sanitization" is in addition to that, or is the extent of it, is not specified in source.
 
 ---
 
 ## Validation Layer
 
-⚠️ **Not documented in source.** Data sanitization is confirmed (NoSQL-injection framing), but no specific validation library (Joi, Zod, express-validator, class-validator) or schema definitions are shown. 🔍 **Inferred**: given the layered architecture diagram, request validation most plausibly sits in `middleware/` ahead of controllers — but that's an architectural inference from where validation *would* belong, not a confirmed file-level detail.
+⚠️ **Not documented in source.** Data sanitization is confirmed (SQL-injection framing), but no specific validation library (Joi, Zod, express-validator, class-validator) or schema definitions are shown. 🔍 **Inferred**: given the layered architecture diagram, request validation most plausibly sits in `middleware/` ahead of controllers — but that's an architectural inference from where validation *would* belong, not a confirmed file-level detail.
 
 ---
 
@@ -227,7 +227,7 @@ erDiagram
 
 ✅ **Confirmed**: centralized/global error handling is an explicit documented design goal, implemented as Express error-handling middleware (the natural home for it given the Middleware layer sits between routes and controllers in the architecture diagram).
 
-⚠️ **Not documented**: the actual error-response shape/contract (status codes, message format, whether errors carry a machine-readable code), whether errors are classified as operational vs. programmer errors, and whether uncaught exceptions or unhandled promise rejections have process-level handlers (`process.on('uncaughtException', ...)`, etc.) — this last one matters for whether the process crashes cleanly or hangs on an unexpected error.
+⚠️ **Not documented**: the actual error-response shape/contract (status codes, message format, whether errors carry a machine-readable code), whether Prisma-specific errors (e.g., unique-constraint violations) are caught and translated into client-friendly messages or leak through as raw database errors, whether errors are classified as operational vs. programmer errors, and whether uncaught exceptions or unhandled promise rejections have process-level handlers (`process.on('uncaughtException', ...)`, etc.).
 
 ---
 
@@ -251,7 +251,7 @@ erDiagram
 sequenceDiagram
     participant Client
     participant SocketMgr as Socket Manager
-    participant DB as MongoDB
+    participant DB as PostgreSQL
 
     Client->>SocketMgr: connect (with auth token)
     SocketMgr->>SocketMgr: verify token
@@ -282,13 +282,13 @@ sequenceDiagram
 - **Socket.IO** for real-time delivery, avoiding polling.
 - Layered architecture keeps controllers thin, making later targeted optimization (e.g., service-layer caching) tractable without restructuring.
 
-⚠️ **Not documented**: caching layer (Redis or otherwise), database indexing strategy, connection pooling configuration, or any load-testing results. Given MongoDB is confirmed but schemas aren't, it's not possible to assess whether common query patterns (e.g., fetching a feed sorted by recency, or a user's follower list) are actually indexed — this is worth checking directly in `models/` before scaling traffic.
+⚠️ **Not documented**: caching layer (Redis or otherwise), database indexing strategy, connection pooling configuration (Prisma's own connection pool sizing and whether an external pooler like PgBouncer sits in front of it), or any load-testing results. Given PostgreSQL is confirmed but the schema isn't, it's not possible to assess whether common query patterns (e.g., fetching a feed sorted by recency, or a user's follower list) are actually indexed — this is worth checking directly in `prisma/schema.prisma` before scaling traffic.
 
 ---
 
 ## Scalability Considerations
 
-⚠️ **Not directly documented.** The confirmed stack (JWT auth — stateless-friendly, MongoDB, Socket.IO) is *compatible* with horizontal scaling in principle, but none of the following are confirmed: a Socket.IO adapter for multi-instance pub/sub (a **Redis adapter is required**, not optional, the moment you run more than one backend process — raw Socket.IO doesn't fan out broadcasted events across separate Node processes on its own), containerization, or a process manager (PM2, etc.) for restart/zero-downtime-deploy handling. Treat single-instance operation as the current, confirmed reality.
+⚠️ **Not directly documented.** The confirmed stack (JWT auth — stateless-friendly, PostgreSQL, Socket.IO) is *compatible* with horizontal scaling in principle, but none of the following are confirmed: a Socket.IO adapter for multi-instance pub/sub (a **Redis adapter is required**, not optional, the moment you run more than one backend process — raw Socket.IO doesn't fan out broadcasted events across separate Node processes on its own), PostgreSQL connection-pool sizing under concurrent instances (a naive multi-instance deployment can exhaust the database's max-connections limit fast without a pooler), containerization, or a process manager (PM2, etc.) for restart/zero-downtime-deploy handling. Treat single-instance operation as the current, confirmed reality.
 
 ---
 
@@ -299,7 +299,7 @@ backend/
 ├── config/             # Database connection & CORS configuration
 ├── controllers/        # Request-handling logic per route
 ├── middleware/         # Auth, authorization, and error-handling middleware
-├── models/             # Mongoose schema definitions
+├── prisma/             # Prisma schema definitions
 ├── routes/             # API endpoint definitions
 ├── socket/             # WebSocket event management (Socket.IO)
 ├── utils/              # Helper functions
@@ -313,13 +313,13 @@ backend/
 
 ## Environment Variables
 
-✅ **Confirmed**: a `.env.example` template exists, and a MongoDB connection string is explicitly required.
+✅ **Confirmed**: a `.env.example` template exists, and a PostgreSQL connection string is explicitly required.
 
-⚠️ **Not enumerated in source** beyond that. The table below lists what a service with this confirmed feature set (JWT dual-token auth, MongoDB, CORS-restricted API, file uploads) would need at minimum — treat it as a checklist to verify against the real `.env.example`, not as a confirmed variable list:
+⚠️ **Not enumerated in source** beyond that. The table below lists what a service with this confirmed feature set (JWT dual-token auth, PostgreSQL via Prisma, CORS-restricted API, file uploads) would need at minimum — treat it as a checklist to verify against the real `.env.example`, not as a confirmed variable list:
 
 | Variable (expected) | Confirmed? | Purpose |
 |---|---|---|
-| `MONGODB_URI` | ✅ Confirmed required | Database connection string |
+| `DATABASE_URL` | ✅ Confirmed required | PostgreSQL connection string, e.g. `postgresql://user:password@localhost:5432/mansati` |
 | `JWT_ACCESS_SECRET` | ⚠️ Not documented (expected, given dual-token JWT) | Signs access tokens |
 | `JWT_REFRESH_SECRET` | ⚠️ Not documented (expected) | Signs refresh tokens |
 | `PORT` | ⚠️ Not documented (expected; frontend assumes `5000`) | Server listen port |
@@ -331,14 +331,14 @@ Consult the repository's actual `.env.example` for the authoritative list before
 
 ## Installation & Setup
 
-**Prerequisites**: Node.js LTS (20+), a reachable MongoDB instance.
+**Prerequisites**: Node.js LTS (20+), a reachable PostgreSQL instance.
 
 ```bash
 git clone https://github.com/mohammed-dev-stack/mansati-backend.git
 cd mansati-backend
 npm install
 cp .env.example .env
-# edit .env: set MongoDB URI and any other required variables
+# edit .env: set DATABASE_URL and any other required variables
 npm run dev
 ```
 
@@ -346,7 +346,7 @@ npm run dev
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Server fails to start / crashes immediately | Missing or invalid `MONGODB_URI` | Confirm `.env` is populated and MongoDB is reachable from this machine |
+| Server fails to start / crashes immediately | Missing or invalid `DATABASE_URL` | Confirm `.env` is populated and PostgreSQL is reachable from this machine |
 | Frontend gets CORS errors | `CORS_ORIGIN` not configured for the frontend's dev URL | Confirm the backend's CORS config allows `http://localhost:3000` (or your frontend's actual origin) |
 | Frontend requests get 401 immediately | JWT secret misconfigured, or cookies not being set/read due to origin mismatch | Verify JWT secrets are set and that both apps agree on cookie domain/`SameSite` settings during local dev |
 | Real-time features don't connect | Socket.IO server not mounted on the same port as the HTTP server, or `NEXT_PUBLIC_SOCKET_URL` mismatch on the frontend | Confirm the socket manager is initialized against the same `server.js` HTTP server instance |
@@ -357,13 +357,13 @@ npm run dev
 npm run dev
 ```
 
-✅ **Confirmed**: this starts the server in development mode. ⚠️ **Not documented**: the exact contents of `npm run dev` (nodemon vs. a custom watch script) or any other `package.json` scripts (test, lint, build) — none were provided in source. The companion frontend expects this service at `http://localhost:5000` by default, so keep ports aligned across both repos during local development.
+✅ **Confirmed**: this starts the server in development mode. ⚠️ **Not documented**: the exact contents of `npm run dev` (nodemon vs. a custom watch script) or any other `package.json` scripts (test, lint, build, or Prisma-related scripts like `prisma migrate dev` / `prisma generate`) — none were provided in source. The companion frontend expects this service at `http://localhost:5000` by default, so keep ports aligned across both repos during local development.
 
 ## Deployment
 
 ⚠️ **Not documented in source** — no Dockerfile, CI/CD pipeline, or named hosting target (Render, Railway, a VPS, etc.) is specified. Given the confirmed stack, any real deployment target needs:
 - A **persistent Node process**, not a serverless function — the stateful WebSocket connections rule out most serverless platforms as a direct fit.
-- A reachable **MongoDB instance** (Atlas or self-hosted).
+- A reachable **PostgreSQL instance** (a managed provider or self-hosted), with `prisma migrate deploy` run against it as part of the deployment step.
 - **CORS/env configuration** pointed at the deployed frontend's actual origin, not `localhost`.
 
 Document the real target once confirmed — this section should not be treated as deployment instructions today.
@@ -377,7 +377,7 @@ Document the real target once confirmed — this section should not be treated a
 📋 **Planned / recommended next steps**, inferred from the documented gaps above (not a stated roadmap — the source provides none for the backend specifically):
 
 - [ ] Publish full API documentation (OpenAPI/Swagger) covering the complete route set beyond the 5 confirmed endpoints.
-- [ ] Document Mongoose schemas and their actual relationships.
+- [ ] Document the Prisma schema and its actual table relations.
 - [ ] Add structured logging (Winston/Pino) with log levels and a shipping destination.
 - [ ] Add a `/health` endpoint and basic process/DB-connection monitoring.
 - [ ] Document rate-limit thresholds and confirm route coverage.
@@ -385,7 +385,7 @@ Document the real target once confirmed — this section should not be treated a
 - [ ] Add automated tests (unit + integration) and a CI pipeline.
 - [ ] Resolve the token-storage documentation mismatch with the frontend repository (HttpOnly cookie vs. `sessionStorage`).
 - [ ] Document the validation library and strategy in use.
-- [ ] Define and document the error-response contract.
+- [ ] Define and document the error-response contract, including how Prisma errors are translated for clients.
 
 ## Contributing Guide
 
@@ -393,9 +393,9 @@ Document the real target once confirmed — this section should not be treated a
 
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/your-feature`.
-3. Implement the change, following the existing layered pattern (routes → middleware → controllers → services → models) — business logic belongs in services, not controllers.
+3. Implement the change, following the existing layered pattern (routes → middleware → controllers → services → Prisma) — business logic belongs in services, not controllers.
 4. Add tests if a test suite exists in the repository (none is confirmed as of this writing).
-5. Open a PR describing the change and, if it touches the API surface, which endpoints are affected.
+5. Open a PR describing the change and, if it touches the API surface or schema, which endpoints or tables are affected.
 
 ## License
 
@@ -404,7 +404,7 @@ MIT — see `LICENSE` for full terms.
 ## Author & Contact
 
 **Mohammed Qannan**
-Full-Stack Developer — Node.js/Express and MongoDB on the backend, Next.js/React/TypeScript on the frontend, with a layered-architecture discipline applied on both sides.
+Full-Stack Developer — Node.js/Express and PostgreSQL on the backend, Next.js/React/TypeScript on the frontend, with a layered-architecture discipline applied on both sides.
 
 **Project links**
 - Backend repository: https://github.com/mohammed-dev-stack/mansati-backend
